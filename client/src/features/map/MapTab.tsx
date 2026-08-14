@@ -14,7 +14,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import type { GlobalAircraft, Movement, SpotEvaluation } from '../../../../shared/types.ts';
+import type {
+  GlobalAircraft,
+  Movement,
+  MovementKind,
+  Snapshot,
+  SpotEvaluation,
+} from '../../../../shared/types.ts';
 import { useNow, useSnapshot } from '../../api/useSnapshot.ts';
 import { navigateTo, useRouteDetail } from '../../state/route.ts';
 import { useSelection } from '../../state/selection.tsx';
@@ -28,12 +34,15 @@ import {
   phaseLabel,
   routeLabel,
 } from '../../lib/format.ts';
+import { haversineKm } from '../../lib/geo.ts';
 import type { AircraftMarkerHandle, AircraftVisual, MarkerKind } from './aircraftMarker.ts';
 import { createAircraftMarker, createTrailLayer, deadReckon, lerpAngle } from './aircraftMarker.ts';
-import { AIRPORT, AIRPORT_ZOOM, airportBounds, createRunwayOverlay, createSpotOverlay } from './overlays.ts';
+import type { FrameChrome } from './overlays.ts';
+import { AIRPORT, AIRPORT_ZOOM, applyFrame, createRunwayOverlay, createSpotOverlay } from './overlays.ts';
 import './MapTab.css';
 
 const DASH = '—';
+const KM_PER_NM = 1.852;
 
 /** How far ahead of the last fix we are willing to guess a position. */
 const MAX_EXTRAPOLATION_S = 120;
@@ -42,6 +51,8 @@ const BLEND_MS = 700;
 
 /** Zoom used when another tab points the map at one particular spotting location. */
 const SPOT_FOCUS_ZOOM = 14;
+/** Space between the bottom of an opened spot card and its pin: the tip, and room to breathe. */
+const SPOT_PIN_CLEARANCE = 26;
 
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
@@ -279,6 +290,205 @@ function stepAircraft(states: Map<string, TrackState>, animate: boolean, now: nu
   }
 }
 
+/* ---- Framing --------------------------------------------------------------------- */
+
+/**
+ * What "the right view" is, and when the map is allowed to take it.
+ *
+ * The reader arrives here from a Board that is counting down an inbound whale. An LHR-centred
+ * view spanning ten miles answers none of that: the aeroplane they came to see is thirty miles
+ * off the edge and the map reads as broken. So the opening view is fitted to Heathrow *plus the
+ * A380s that have a relationship with it*.
+ *
+ * Two rules keep that from becoming a nuisance.
+ *
+ * The near field wins. An inbound 20 nm out and one 400 nm out cannot share a useful frame, so
+ * the frame is scaled to the closest inbound and given room to breathe; anything much further out
+ * is still drawn, still counted, and said out loud rather than silently framed in. The single
+ * exception is the closest inbound itself, which is always held in view however far out it is —
+ * subject to the zoom floor in overlays.ts, past which the honest answer is "off this view".
+ *
+ * And the map never argues with the hand on it. The moment the reader pans, pinches, wheels or
+ * presses a zoom control, automatic framing stops until they ask for it back.
+ */
+
+/** The frame never scales tighter than this, so a whale on short final still has its context. */
+const FRAME_NEAR_NM = 60;
+/** Room allowed around the closest inbound, as a multiple of its distance. */
+const FRAME_SPAN_FACTOR = 2.5;
+/** How far a *second* aircraft may pull the frame out once a closer one has set the scale. */
+const FRAME_LIMIT_NM = 600;
+/** A departure stops being map news out here; from then on it is the Board's story, not ours. */
+const FRAME_DEPARTURE_NM = 80;
+/** A re-frame that no aircraft arrived or left to justify waits at least this long. */
+const MIN_AUTO_FRAME_MS = 10_000;
+
+/** The keys Leaflet's own keyboard handler pans and zooms with — pressing one is steering. */
+const PAN_KEYS = new Set([
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  '+',
+  '=',
+  '-',
+  '_',
+]);
+
+/** Whether the map is following the traffic or the reader. */
+type Framing = 'auto' | 'manual';
+
+interface FrameSubject {
+  hex: string;
+  /** Which board it is on: what it is doing, not where it is. */
+  kind: MovementKind;
+  lat: number;
+  lon: number;
+  distanceNm: number;
+}
+
+interface FramePlan {
+  /** Every A380 with a Heathrow relationship *and* a position — the whole truth. */
+  subjects: FrameSubject[];
+  /** The positions the frame must hold. Heathrow itself is always included on top of these. */
+  points: L.LatLngTuple[];
+  /** Identity of the framed set; the frame is re-applied when this changes. */
+  key: string;
+  /** Distance of the furthest framed aircraft, nm. Zero when only the airport is framed. */
+  spanNm: number;
+  inbound: number;
+  outbound: number;
+  onGround: number;
+  /** Tracked aircraft deliberately left outside the frame, nearest first. */
+  beyond: FrameSubject[];
+  /** Arrivals the tracker is holding that have no position to draw. */
+  unplotted: number;
+}
+
+const EMPTY_PLAN: FramePlan = {
+  subjects: [],
+  points: [],
+  key: '',
+  spanNm: 0,
+  inbound: 0,
+  outbound: 0,
+  onGround: 0,
+  beyond: [],
+  unplotted: 0,
+};
+
+/**
+ * Distance to Heathrow. The wire carries one; it is only recomputed when the server had no answer
+ * but we do have a position, and never invented when we have neither.
+ */
+function distanceNmOf(movement: Movement, position: { lat: number; lon: number }): number {
+  const reported = movement.distanceNm;
+  if (typeof reported === 'number' && Number.isFinite(reported) && reported >= 0) return reported;
+  return haversineKm(AIRPORT, position) / KM_PER_NM;
+}
+
+function buildFramePlan(snapshot: Snapshot | null): FramePlan {
+  if (!snapshot) return EMPTY_PLAN;
+
+  const groups: readonly (readonly [MovementKind, readonly Movement[]])[] = [
+    ['arrival', snapshot.arrivals],
+    ['departure', snapshot.departures],
+    ['ground', snapshot.ground],
+  ];
+
+  const subjects: FrameSubject[] = [];
+  const seen = new Set<string>();
+  let unplotted = 0;
+
+  for (const [kind, group] of groups) {
+    for (const movement of group) {
+      if (seen.has(movement.id)) continue;
+      const position = positionOf(movement);
+      if (!position) {
+        // Tracked, but out of ADS-B coverage. It is not on the map and must not be framed as if
+        // it were — the empty state says so instead of leaving a hole.
+        if (kind === 'arrival') unplotted += 1;
+        continue;
+      }
+      seen.add(movement.id);
+      subjects.push({
+        hex: movement.id,
+        kind,
+        lat: position.lat,
+        lon: position.lon,
+        distanceNm: distanceNmOf(movement, position),
+      });
+    }
+  }
+
+  const closest = subjects
+    .filter((subject) => subject.kind === 'arrival')
+    .reduce<FrameSubject | null>(
+      (best, subject) => (best === null || subject.distanceNm < best.distanceNm ? subject : best),
+      null,
+    );
+
+  const reach =
+    closest === null
+      ? FRAME_DEPARTURE_NM
+      : Math.min(FRAME_LIMIT_NM, Math.max(FRAME_NEAR_NM, closest.distanceNm * FRAME_SPAN_FACTOR));
+
+  const framed: FrameSubject[] = [];
+  const beyond: FrameSubject[] = [];
+
+  for (const subject of subjects) {
+    const limit = subject.kind === 'departure' ? Math.min(reach, FRAME_DEPARTURE_NM) : reach;
+    const keep = subject.kind === 'ground' || subject === closest || subject.distanceNm <= limit;
+    (keep ? framed : beyond).push(subject);
+  }
+  beyond.sort((a, b) => a.distanceNm - b.distanceNm);
+
+  return {
+    subjects,
+    points: framed.map((subject) => [subject.lat, subject.lon] as L.LatLngTuple),
+    // The kind is part of the identity: an arrival that lands keeps its hex and becomes a
+    // completely different framing problem.
+    key: framed
+      .map((subject) => `${subject.hex}:${subject.kind}`)
+      .sort()
+      .join(' '),
+    spanNm: framed.reduce((max, subject) => Math.max(max, subject.distanceNm), 0),
+    inbound: framed.filter((subject) => subject.kind === 'arrival').length,
+    outbound: framed.filter((subject) => subject.kind === 'departure').length,
+    onGround: framed.filter((subject) => subject.kind === 'ground').length,
+    beyond,
+    unplotted,
+  };
+}
+
+/**
+ * Whether the traffic has moved enough to be worth a new frame. Ratios rather than thresholds, so
+ * an aeroplane loitering either side of a fixed distance cannot make the map twitch every poll.
+ */
+function scaleChangedMaterially(before: number, after: number): boolean {
+  if (before <= 0) return after > 0;
+  return after < before * 0.55 || after > before * 1.9;
+}
+
+/** What the map just did, in a sentence, including what it could not fit. */
+function frameSummary(plan: FramePlan, units: 'metric' | 'imperial'): string {
+  const bits: string[] = [];
+  if (plan.inbound > 0) bits.push(`${plan.inbound} inbound`);
+  if (plan.outbound > 0) bits.push(`${plan.outbound} outbound`);
+  if (plan.onGround > 0) bits.push(`${plan.onGround} on the ground`);
+
+  const furthest = plan.beyond[0];
+  const tail =
+    furthest === undefined
+      ? ''
+      : plan.beyond.length === 1
+        ? ` · 1 more A380, ${formatDistance(furthest.distanceNm, units)} out`
+        : ` · ${plan.beyond.length} more A380s, ${formatDistance(furthest.distanceNm, units)} and beyond`;
+
+  if (bits.length === 0) return `Framed on Heathrow — nothing else to show right now${tail}`;
+  return `Framed on Heathrow · ${bits.join(' · ')}${tail}`;
+}
+
 /* ---- Spots ---------------------------------------------------------------------- */
 
 function isSpotEvaluation(value: unknown): value is SpotEvaluation {
@@ -297,10 +507,16 @@ export function MapTab(): ReactElement {
   const { settings } = useSettings();
   const theme = useMapTheme();
   const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
-  const roomForLegend = useMediaQuery('(min-width: 768px)');
+  // Height matters as much as width: a landscape phone is wide enough for the legend and has
+  // nowhere to put it, so it opened on top of the status pill over a 130 px strip of map.
+  const roomForLegend = useMediaQuery('(min-width: 768px) and (min-height: 560px)');
   const now = useNow(5000);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const controlsRef = useRef<HTMLDivElement | null>(null);
+  const legendRef = useRef<HTMLDetailsElement | null>(null);
+  const topLeftRef = useRef<HTMLDivElement | null>(null);
+  const emptyRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const aircraftLayerRef = useRef<L.LayerGroup | null>(null);
@@ -320,6 +536,14 @@ export function MapTab(): ReactElement {
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(roomForLegend);
 
+  /** True while a spot card is open on the map — it is what the reader asked to look at. */
+  const [spotCardOpen, setSpotCardOpen] = useState(false);
+  /** Auto until the reader touches the map; then theirs until they hand it back. */
+  const [framing, setFraming] = useState<Framing>('auto');
+  const framingRef = useRef<Framing>('auto');
+  /** How many tracked A380s are currently outside the visible rectangle, however it got there. */
+  const [offView, setOffView] = useState(0);
+
   selectRef.current = select;
 
   // Open by default where there is room for it, folded away on a phone.
@@ -327,11 +551,61 @@ export function MapTab(): ReactElement {
 
   const announce = useCallback((message: string) => setAnnouncement(message), []);
 
+  /**
+   * The floating chrome, measured rather than assumed. The rail reflows to two rows of three on
+   * a short screen and the legend is open on a desktop and folded on a phone; a frame built on
+   * assumed sizes is a frame that hides an aeroplane under a panel.
+   *
+   * Declared up here because two different things need it: the framing, and the spot popups,
+   * which Leaflet would otherwise open underneath the status stack.
+   */
+  const chromeInsets = useCallback((): FrameChrome => {
+    const gap = 12;
+    const rail = controlsRef.current?.getBoundingClientRect().width ?? 44;
+    const stack = topLeftRef.current?.getBoundingClientRect().height ?? 0;
+    const legend = legendOpen ? (legendRef.current?.getBoundingClientRect().width ?? 0) : 0;
+    return {
+      // The status stack grows: the framing chip, the empty-state card and the "tiles are not
+      // loading" note all live in it, and on a phone that is a third of the map.
+      top: Math.round(stack) + gap,
+      right: Math.round(rail) + gap,
+      bottom: 34, // the tile attribution
+      left: legend > 0 ? Math.round(legend) + gap : 0,
+    };
+  }, [legendOpen]);
+
+  /**
+   * The same measurement, for a spot card that is about to open.
+   *
+   * The "nothing to draw" card is discounted because opening this popup is what hides it: measure
+   * the stack as it stands and the card is panned clear of a panel that will not be there, which
+   * on a phone pushes it off the bottom of the map instead.
+   */
+  const popupChrome = useCallback((): FrameChrome => {
+    const chrome = chromeInsets();
+    const empty = emptyRef.current?.getBoundingClientRect().height ?? 0;
+    // The legend sits bottom-left, and even folded away it is a button the card must not land on
+    // — but only where it stays put. On a phone it stands down while a card is open, so reserving
+    // its height there would push the card up for a panel that will not be there.
+    const legend = roomForLegend ? (legendRef.current?.getBoundingClientRect().height ?? 0) : 0;
+    return {
+      ...chrome,
+      top: empty > 0 ? Math.max(12, chrome.top - Math.round(empty) - 8) : chrome.top,
+      bottom: Math.max(chrome.bottom, Math.round(legend) + 12),
+    };
+  }, [chromeInsets, roomForLegend]);
+
   useEffect(() => {
     if (announcement === null) return;
     const timer = window.setTimeout(() => setAnnouncement(null), 6000);
     return () => window.clearTimeout(timer);
   }, [announcement]);
+
+  /** Every framing change goes through here, so the gesture watcher can see "already manual". */
+  const setFramingMode = useCallback((mode: Framing) => {
+    framingRef.current = mode;
+    setFraming(mode);
+  }, []);
 
   /* -- Map lifecycle ------------------------------------------------------------- */
 
@@ -369,6 +643,11 @@ export function MapTab(): ReactElement {
     });
     spotRef.current = spotOverlay;
 
+    const onPopupOpen = (): void => setSpotCardOpen(true);
+    const onPopupClose = (): void => setSpotCardOpen(false);
+    map.on('popupopen', onPopupOpen);
+    map.on('popupclose', onPopupClose);
+
     // The tab area changes with rotation, keyboard, and desktop resize.
     const resize = new ResizeObserver(() => map.invalidateSize({ animate: false }));
     resize.observe(container);
@@ -381,6 +660,8 @@ export function MapTab(): ReactElement {
 
     return () => {
       window.removeEventListener('orientationchange', onOrientation);
+      map.off('popupopen', onPopupOpen);
+      map.off('popupclose', onPopupClose);
       resize.disconnect();
       for (const state of statesRef.current.values()) state.handle.marker.remove();
       statesRef.current.clear();
@@ -505,9 +786,11 @@ export function MapTab(): ReactElement {
     const overlay = spotRef.current;
     if (!map || !overlay || !mapReady) return;
     overlay.update(spots ?? []);
+    // Measured after the update, so a popup opened by a tap clears whatever the stack is now.
+    overlay.setChrome(popupChrome(), map.getSize().y);
     if (showSpots && spots && spots.length > 0) overlay.layer.addTo(map);
     else overlay.layer.remove();
-  }, [mapReady, showSpots, spots]);
+  }, [mapReady, popupChrome, showSpots, spots]);
 
   /* -- A spot handed to us by the Spots tab ----------------------------------------- */
 
@@ -532,11 +815,32 @@ export function MapTab(): ReactElement {
     }
     focusedRef.current = focusSpotId;
     setWorldView(false);
-    map.setView(marker.getLatLng(), Math.max(map.getZoom(), SPOT_FOCUS_ZOOM), {
-      animate: !reducedMotion,
-    });
+    // Someone named a fence. Automatic framing would take it away again on the next material
+    // change, so this counts as the reader steering.
+    setFramingMode('manual');
+    /*
+     * The pin is placed rather than centred, and the view is cut rather than flown.
+     *
+     * A spot card opens upwards out of its pin and is most of the height of a phone map, so a
+     * centred pin puts the card through the top of the canvas and behind the status stack — the
+     * one thing the reader asked to see, hidden by our own furniture. Leaflet's auto-pan is meant
+     * to fix that and cannot be relied on here: it is undone by a zoom animation still in flight,
+     * and it measures a container it does not know is two-thirds covered. So the arithmetic is
+     * done here instead — drop the pin far enough below the chrome for the card to stand up in —
+     * and auto-pan stays configured as the backstop for a pin tapped directly on the map.
+     */
+    const chrome = popupChrome();
+    const size = map.getSize();
+    const zoom = Math.max(map.getZoom(), SPOT_FOCUS_ZOOM);
+    const cardHeight = overlay.setChrome(chrome, size.y);
+    const pinY = Math.min(chrome.top + cardHeight + SPOT_PIN_CLEARANCE, size.y - chrome.bottom);
+    const centre = map.unproject(
+      map.project(marker.getLatLng(), zoom).subtract([0, pinY - size.y / 2]),
+      zoom,
+    );
+    map.setView(centre, zoom, { animate: false });
     marker.openPopup();
-  }, [focusSpotId, mapReady, reducedMotion, showSpots, spots]);
+  }, [focusSpotId, mapReady, popupChrome, setFramingMode, showSpots, spots]);
 
   /* -- Aircraft -------------------------------------------------------------------- */
 
@@ -658,6 +962,10 @@ export function MapTab(): ReactElement {
     trail.update(movement.trail, movementKind(movement));
   }, [trailKey, mapReady]);
 
+  /** The world fleet, for a selection that has no Heathrow movement behind it. */
+  const worldwideRef = useRef<readonly GlobalAircraft[]>([]);
+  worldwideRef.current = snapshot?.worldwide ?? [];
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
@@ -665,11 +973,156 @@ export function MapTab(): ReactElement {
     previousSelection.current = selectedHex;
     if (!changed || !selectedHex) return;
     const state = statesRef.current.get(selectedHex);
-    if (!state) return;
+    if (!state) {
+      /*
+       * "Show on map" was pressed on an airframe with no Heathrow movement — the fleet browser is
+       * full of them. Only the LHR traffic is drawn until world view is on, so the map opened on
+       * Heathrow with the aeroplane nowhere on it and no way to tell that had happened. Turn the
+       * world on and go to it: the button offered to show it, so it shows it.
+       */
+      const aircraft = worldwideRef.current.find((item) => item.hex === selectedHex);
+      const lat = aircraft?.lat ?? null;
+      const lon = aircraft?.lon ?? null;
+      if (lat === null || lon === null) return;
+      setWorldView(true);
+      // The reader named one aeroplane; automatic framing would take it away at the next change.
+      setFramingMode('manual');
+      map.setView([lat, lon], Math.max(map.getZoom(), 5), { animate: false });
+      announce('Showing this A380 in the world view — it has no Heathrow movement right now');
+      return;
+    }
     const point = L.latLng(state.renderLat, state.renderLon);
     if (map.getBounds().pad(-0.15).contains(point)) return;
     map.panTo(point, { animate: !reducedMotion });
-  }, [selectedHex, mapReady, reducedMotion]);
+  }, [announce, selectedHex, mapReady, reducedMotion, setFramingMode]);
+
+  /* -- Framing: where the map points ------------------------------------------------- */
+
+  const framePlan = useMemo(() => buildFramePlan(snapshot), [snapshot]);
+  const planRef = useRef(framePlan);
+  planRef.current = framePlan;
+  const lastFrameRef = useRef<{ key: string; spanNm: number; at: number } | null>(null);
+
+  /** Applies the current plan and remembers what it framed. Returns the sentence describing it. */
+  const frameNow = useCallback((): string => {
+    const map = mapRef.current;
+    const plan = planRef.current;
+    if (!map) return '';
+    applyFrame(map, plan.points, { animate: !reducedMotion, chrome: chromeInsets() });
+    lastFrameRef.current = { key: plan.key, spanNm: plan.spanNm, at: Date.now() };
+    return frameSummary(plan, settings.units);
+  }, [chromeInsets, reducedMotion, settings.units]);
+
+  /**
+   * The reader has taken the map. Built from the input events themselves rather than from
+   * Leaflet's move events, because those cannot tell a hand from our own `setView` — wiring it
+   * that way would have the map switching its own framing off every time it framed something.
+   */
+  const takeControl = useCallback(() => {
+    if (framingRef.current === 'manual') return;
+    setFramingMode('manual');
+    announce('Auto-framing paused — the map stays where you put it');
+  }, [announce, setFramingMode]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container || !mapReady) return;
+
+    const onTouchStart = (event: TouchEvent): void => {
+      if (event.touches.length > 1) takeControl();
+    };
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (PAN_KEYS.has(event.key)) takeControl();
+    };
+
+    map.on('dragstart', takeControl);
+    map.on('boxzoomstart', takeControl);
+    container.addEventListener('wheel', takeControl, { passive: true });
+    container.addEventListener('dblclick', takeControl);
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      map.off('dragstart', takeControl);
+      map.off('boxzoomstart', takeControl);
+      container.removeEventListener('wheel', takeControl);
+      container.removeEventListener('dblclick', takeControl);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mapReady, takeControl]);
+
+  // Re-frame on a material change only: a whale appearing, landing or leaving the set, or the
+  // scale of the thing being watched changing by enough to be worth the move.
+  //
+  // `framingRef` is consulted as well as the state, and it is the one that matters on a first
+  // render: the effects that point the map at one named thing — a spot handed over from the Spots
+  // tab, an airframe handed over from the fleet — run before this one and hand control over
+  // through `setFramingMode`, whose state update this pass cannot see. Reading the state alone,
+  // this effect framed the traffic straight back over the top of whatever the reader had asked
+  // for, and only on the very render where they had asked for it.
+  //
+  // A spot handed over in the URL is held off for the same reason and one more: the opening frame
+  // is animated, so even after the hand-over has taken control the frame that was already flying
+  // lands a moment later and takes the view back. Nothing is framed until that fence has been
+  // shown; after it has, framing is manual and this effect is done anyway.
+  useEffect(() => {
+    if (!mapReady || !snapshot || worldView || framing !== 'auto' || framingRef.current !== 'auto') {
+      return;
+    }
+    if (focusSpotId !== null && focusedRef.current !== focusSpotId) return;
+    const last = lastFrameRef.current;
+
+    if (last !== null && last.key === framePlan.key) {
+      if (!scaleChangedMaterially(last.spanNm, framePlan.spanNm)) return;
+      if (Date.now() - last.at < MIN_AUTO_FRAME_MS) return;
+      frameNow();
+      return;
+    }
+
+    const message = frameNow();
+    // Speak only when the cast changed, and never for the opening frame — an aria-live region
+    // that narrates every zoom step is a nuisance to the people who depend on it most.
+    if (last !== null) announce(message);
+  }, [announce, focusSpotId, framePlan, frameNow, framing, mapReady, snapshot, worldView]);
+
+  /* -- What is not on screen ---------------------------------------------------------- */
+
+  /**
+   * However the map came to be framed, it must never quietly hide a whale it is tracking. This is
+   * measured against the real visible rectangle rather than assumed from the frame we asked for.
+   */
+  const subjectsRef = useRef(framePlan.subjects);
+  subjectsRef.current = framePlan.subjects;
+
+  const recountOffView = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const bounds = map.getBounds();
+    let count = 0;
+    for (const subject of subjectsRef.current) {
+      if (!bounds.contains(L.latLng(subject.lat, subject.lon))) count += 1;
+    }
+    setOffView(count);
+  }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    map.on('moveend', recountOffView);
+    map.on('zoomend', recountOffView);
+    return () => {
+      map.off('moveend', recountOffView);
+      map.off('zoomend', recountOffView);
+    };
+  }, [mapReady, recountOffView]);
+
+  // Aircraft move too: one can leave the view without the map moving at all.
+  useEffect(() => {
+    if (!mapReady) return;
+    recountOffView();
+  }, [framePlan, mapReady, recountOffView]);
 
   /* -- Controls --------------------------------------------------------------------- */
 
@@ -677,42 +1130,33 @@ export function MapTab(): ReactElement {
     const map = mapRef.current;
     if (!map) return;
     setWorldView(false);
+    // A deliberate "show me the airport" is a framing decision of the reader's own; keeping the
+    // automatic frame alive would take it back off them at the next material change.
+    setFramingMode('manual');
     map.setView([AIRPORT.lat, AIRPORT.lon], AIRPORT_ZOOM, { animate: !reducedMotion });
-    announce('Recentred on Heathrow');
-  }, [announce, reducedMotion]);
+    announce('Centred on Heathrow · auto-framing paused');
+  }, [announce, reducedMotion, setFramingMode]);
 
-  const fitArrivals = useCallback(() => {
-    const map = mapRef.current;
-    if (!map || !snapshot) return;
-    const points: L.LatLngTuple[] = [[AIRPORT.lat, AIRPORT.lon]];
-    for (const movement of snapshot.arrivals) {
-      const position = positionOf(movement);
-      if (position) points.push([position.lat, position.lon]);
-    }
-    if (points.length < 2) {
-      announce('No inbound A380s with a position to fit right now');
-      return;
-    }
+  const fitTraffic = useCallback(() => {
+    if (!mapRef.current) return;
     setWorldView(false);
-    map.fitBounds(L.latLngBounds(points), {
-      padding: [56, 56],
-      maxZoom: 11,
-      animate: !reducedMotion,
-    });
-    announce(`Fitted ${points.length - 1} inbound A380${points.length - 1 === 1 ? '' : 's'}`);
-  }, [announce, reducedMotion, snapshot]);
+    setFramingMode('auto');
+    announce(frameNow());
+  }, [announce, frameNow, setFramingMode]);
 
   const toggleWorld = useCallback(() => {
     const map = mapRef.current;
     if (!map) return;
-    const next = !worldView;
-    setWorldView(next);
 
-    if (!next) {
-      map.fitBounds(airportBounds(), { animate: !reducedMotion });
-      announce('Back to Heathrow');
+    if (worldView) {
+      setWorldView(false);
+      setFramingMode('auto');
+      announce(frameNow());
       return;
     }
+
+    setWorldView(true);
+    setFramingMode('manual');
 
     const points: L.LatLngTuple[] = [];
     for (const aircraft of snapshot?.worldwide ?? []) {
@@ -727,7 +1171,7 @@ export function MapTab(): ReactElement {
       map.setView([25, 0], 2, { animate: false });
       announce('World view — no A380 positions on the feed right now');
     }
-  }, [announce, reducedMotion, snapshot, worldView]);
+  }, [announce, frameNow, setFramingMode, snapshot, worldView]);
 
   const toggleSpots = useCallback(() => {
     const next = !showSpots;
@@ -739,26 +1183,32 @@ export function MapTab(): ReactElement {
     (delta: number) => {
       const map = mapRef.current;
       if (!map) return;
+      takeControl();
       map.setZoom(map.getZoom() + delta, { animate: !reducedMotion });
     },
-    [reducedMotion],
+    [reducedMotion, takeControl],
   );
 
   /* -- Status line ------------------------------------------------------------------ */
 
+  // Counted off the same list the framing works from, so the pill and the frame can never
+  // disagree about how many whales there are.
   const counts = useMemo(() => {
-    if (!snapshot) return { arrivals: 0, departures: 0, ground: 0, near: 0, world: 0 };
-    const arrivals = snapshot.arrivals.filter((movement) => positionOf(movement)).length;
-    const departures = snapshot.departures.filter((movement) => positionOf(movement)).length;
-    const ground = snapshot.ground.filter((movement) => positionOf(movement)).length;
+    const subjects = framePlan.subjects;
+    const arrivals = subjects.filter((subject) => subject.kind === 'arrival').length;
+    const departures = subjects.filter((subject) => subject.kind === 'departure').length;
+    const ground = subjects.filter((subject) => subject.kind === 'ground').length;
     return {
       arrivals,
       departures,
       ground,
-      near: arrivals + departures + ground,
-      world: snapshot.worldwide.length,
+      near: subjects.length,
+      world: snapshot?.worldwide.length ?? 0,
     };
-  }, [snapshot]);
+  }, [framePlan, snapshot]);
+
+  const stale = snapshot?.health.stale ?? false;
+  const live = connected && !stale;
 
   let status: string;
   if (!snapshot) {
@@ -766,20 +1216,88 @@ export function MapTab(): ReactElement {
   } else if (worldView) {
     status = `World view · ${counts.world} A380${counts.world === 1 ? '' : 's'} on the feed`;
   } else if (counts.near === 0) {
-    status =
-      counts.world > 0
-        ? `No A380s at Heathrow · ${counts.world} elsewhere in the world`
-        : 'No A380s at Heathrow right now';
+    if (framePlan.unplotted > 0) {
+      // "Nothing here" would be a lie: the tracker is holding an arrival, it just has no fix.
+      status = `${framePlan.unplotted} inbound tracked · no position on the feed yet`;
+    } else {
+      status =
+        counts.world > 0
+          ? `No A380s at Heathrow · ${counts.world} elsewhere in the world`
+          : 'No A380s at Heathrow right now';
+    }
   } else {
     const bits: string[] = [];
     if (counts.arrivals > 0) bits.push(`${counts.arrivals} inbound`);
     if (counts.departures > 0) bits.push(`${counts.departures} outbound`);
     if (counts.ground > 0) bits.push(`${counts.ground} on the ground`);
+    // A whale that is tracked but off the edge of the view has to be admitted to. Silence there
+    // is how a map ends up quietly lying about how much it knows.
+    if (offView > 0) bits.push(`${offView} off this view`);
     status = bits.join(' · ');
   }
 
-  const stale = snapshot?.health.stale ?? false;
-  const live = connected && !stale;
+  /* -- Framing chip: the mode, in words, with the way out of it --------------------- */
+
+  const autoFraming = framing === 'auto' && !worldView;
+  const frameChip: {
+    className: string;
+    icon: 'arrival' | 'map';
+    label: string;
+    detail: string;
+    action: () => void;
+  } = worldView
+    ? {
+        className: 'map-frame map-frame--world',
+        icon: 'map',
+        label: 'World view',
+        detail: ' — press to come back to Heathrow and follow its A380s.',
+        action: toggleWorld,
+      }
+    : autoFraming
+      ? {
+          className: 'map-frame map-frame--auto',
+          icon: 'arrival',
+          // "Following traffic" over an empty airfield would be a small boast about nothing.
+          label: counts.near > 0 ? 'Following traffic' : 'Watching for traffic',
+          detail: ' — the map re-frames itself when the traffic changes. Press to fit it again now.',
+          action: fitTraffic,
+        }
+      : {
+          className: 'map-frame map-frame--manual',
+          icon: 'arrival',
+          label: 'Fit traffic',
+          detail: ' — frames Heathrow and its A380s, and follows them again.',
+          action: fitTraffic,
+        };
+
+  /* -- Nothing to draw --------------------------------------------------------------- */
+
+  /*
+   * "Nothing to draw" is a statement about aircraft, and the reader who has just opened a spot
+   * card has asked about a fence. On a phone the two do not fit: the stack is 300 px of a 440 px
+   * map and the card opens underneath it. The pill above still carries the fact, so the card that
+   * was asked for wins and this one waits until it is closed.
+   */
+  const showEmptyState = snapshot !== null && !worldView && counts.near === 0 && !spotCardOpen;
+  const emptyTitle =
+    framePlan.unplotted > 0
+      ? `${framePlan.unplotted} inbound, no position yet`
+      : 'Nothing to draw right now';
+  const emptyLines: string[] = [];
+  if (framePlan.unplotted > 0) {
+    emptyLines.push(
+      framePlan.unplotted === 1
+        ? 'The feed has no position for it — ADS-B coverage over the ocean is patchy, so it will appear here the moment there is a fix.'
+        : 'The feed has no position for them — ADS-B coverage over the ocean is patchy, so they will appear here the moment there is a fix.',
+    );
+  } else {
+    emptyLines.push(
+      'Every A380 in the world is being watched for one arriving here or leaving. The runways below show the configuration in use right now.',
+    );
+  }
+  if (!live) {
+    emptyLines.push('The feed has gone quiet, so this is the last picture we had.');
+  }
 
   return (
     <section className="map-tab" aria-label="Live map of Heathrow A380 traffic">
@@ -789,52 +1307,73 @@ export function MapTab(): ReactElement {
         eleven spot pins and every aircraft on screen — 52 presses in world view — to reach the
         zoom buttons, and world view can only be turned off from those buttons. Both blocks are
         absolutely positioned, so nothing about the layout changes.
+
+        Every control names itself, too. The labels are real elements rather than `title`
+        attributes: a native tooltip needs a mouse, waits a second, cannot be styled and is never
+        read out — which left the whole rail, including the control that fixes a badly framed
+        map, as six unexplained glyphs. These show on hover *and* on keyboard focus, and they are
+        the accessible name of the button rather than a duplicate of it.
       */}
-      <div className="map-controls" role="group" aria-label="Map controls">
-        <button type="button" className="map-btn" onClick={() => zoomBy(1)} title="Zoom in">
+      <div className="map-controls" role="group" aria-label="Map controls" ref={controlsRef}>
+        <button type="button" className="map-btn" onClick={() => zoomBy(1)}>
           <span className="map-btn-glyph" aria-hidden="true">
             +
           </span>
-          <span className="app-visually-hidden">Zoom in</span>
+          <span className="map-btn-label">Zoom in</span>
         </button>
-        <button type="button" className="map-btn" onClick={() => zoomBy(-1)} title="Zoom out">
+        <button type="button" className="map-btn" onClick={() => zoomBy(-1)}>
           <span className="map-btn-glyph" aria-hidden="true">
             −
           </span>
-          <span className="app-visually-hidden">Zoom out</span>
+          <span className="map-btn-label">Zoom out</span>
         </button>
-        <button type="button" className="map-btn" onClick={recentre} title="Recentre on Heathrow">
+        <button type="button" className="map-btn" onClick={recentre}>
           <Icon name="runway" size={20} />
-          <span className="app-visually-hidden">Recentre on Heathrow</span>
+          <span className="map-btn-label">Centre on Heathrow</span>
         </button>
-        <button type="button" className="map-btn" onClick={fitArrivals} title="Fit all arrivals">
+        <button
+          type="button"
+          className={autoFraming ? 'map-btn map-btn--on' : 'map-btn'}
+          onClick={fitTraffic}
+        >
           <Icon name="arrival" size={20} />
-          <span className="app-visually-hidden">Fit all inbound A380s in view</span>
+          <span className="map-btn-label">Fit traffic</span>
+          <span className="app-visually-hidden">
+            {autoFraming
+              ? ' — Heathrow and its A380s. Auto-framing is on.'
+              : ' — Heathrow and its A380s. Auto-framing is paused.'}
+          </span>
         </button>
         <button
           type="button"
           className={showSpots ? 'map-btn map-btn--on' : 'map-btn'}
           onClick={toggleSpots}
           aria-pressed={showSpots}
-          title={showSpots ? 'Hide spotting locations' : 'Show spotting locations'}
         >
           <Icon name="binoculars" size={20} />
-          <span className="app-visually-hidden">Spotting locations</span>
+          <span className="map-btn-label">Spotting locations</span>
         </button>
         <button
           type="button"
           className={worldView ? 'map-btn map-btn--on' : 'map-btn'}
           onClick={toggleWorld}
           aria-pressed={worldView}
-          title={worldView ? 'Back to Heathrow' : 'Show every A380 in the world'}
         >
           <Icon name="map" size={20} />
-          <span className="app-visually-hidden">World view</span>
+          <span className="map-btn-label">Every A380 in the world</span>
         </button>
       </div>
 
+      {/*
+        On a phone the legend and an opened spot card are competing for the same corner of a 440 px
+        map, and the card is the thing the reader asked for. Where there is room for both — the
+        desktop and a tablet — nothing is taken away.
+      */}
       <details
-        className="map-legend"
+        className={
+          spotCardOpen && !roomForLegend ? 'map-legend map-legend--hidden' : 'map-legend'
+        }
+        ref={legendRef}
         open={legendOpen}
         onToggle={(event) => setLegendOpen(event.currentTarget.open)}
       >
@@ -893,7 +1432,7 @@ export function MapTab(): ReactElement {
         aria-label="Map. Aircraft and spotting locations are focusable; use arrow keys to pan and plus or minus to zoom."
       />
 
-      <div className="map-topleft">
+      <div className="map-topleft" ref={topLeftRef}>
         <div className="map-status">
           <p className="map-status-line" aria-live="polite">
             <span
@@ -910,6 +1449,40 @@ export function MapTab(): ReactElement {
                 : `Reconnecting · last update ${formatRelative(lastUpdate, now)}`}
           </p>
         </div>
+
+        {/*
+          What the map is doing with itself, in words, and the way back. "Following traffic" is
+          the state the map opens in; the moment the reader pans or zooms it becomes "Fit traffic"
+          — an offer, not a nag, and the one control that undoes a lost view.
+        */}
+        <button type="button" className={frameChip.className} onClick={frameChip.action}>
+          <Icon name={frameChip.icon} size={15} />
+          <span>{frameChip.label}</span>
+          <span className="app-visually-hidden">{frameChip.detail}</span>
+        </button>
+
+        {/*
+          Nothing to draw is an answer, and it belongs in the same column as every other thing the
+          map has to say about itself — centred over the airfield it would land on the status
+          stack on a phone, which is how a designed empty state turns into a pile-up. Not a live
+          region: the status pill above already announces the same fact, and twice is worse.
+        */}
+        {showEmptyState ? (
+          <div className="map-empty" ref={emptyRef}>
+            <p className="map-empty-head">
+              <span className="map-empty-icon" aria-hidden="true">
+                <Icon name="binoculars" size={16} />
+              </span>
+              <span className="map-empty-title">{emptyTitle}</span>
+            </p>
+            <p className="map-empty-text">{emptyLines.join(' ')}</p>
+            {counts.world > 0 ? (
+              <button type="button" className="map-empty-action" onClick={toggleWorld}>
+                Show all {counts.world} A380s worldwide
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {basemapDown ? (
           <p className="map-basemap-note" role="status">

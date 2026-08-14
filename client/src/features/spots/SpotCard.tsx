@@ -158,6 +158,12 @@ export function SpotCard(p: {
 
   const walk = formatWalk(evaluation.distanceKm, units);
   const leadReason = reasons[0] ?? null;
+  /*
+   * The lead reason is already on the card, two lines above, and it stays there when the drawer
+   * opens. Repeating it verbatim as the first bullet under "Why it ranks here" read as a stutter
+   * — the same sentence twice inside one card — so the list carries what the lead did not say.
+   */
+  const furtherReasons = leadReason === null ? reasons : reasons.slice(1);
   const ratingWord = RATING_WORDS[rating] ?? 'Unrated';
   const sees = seesOf(spot);
   const airside = spot.accessType === 'airside';
@@ -236,14 +242,19 @@ export function SpotCard(p: {
           <div className="spot-detail" id={detailId}>
             <div className="spot-block">
               <h4 className="spot-block-title">Why it ranks here</h4>
-              {reasons.length > 0 ? (
+              {furtherReasons.length > 0 ? (
                 <ul className="spot-reasons">
-                  {reasons.map((reason, index) => (
+                  {furtherReasons.map((reason, index) => (
                     <li className="spot-reason" key={`${index}-${reason}`}>
                       {reason}
                     </li>
                   ))}
                 </ul>
+              ) : leadReason !== null ? (
+                <p className="spot-plain">
+                  That one line is the whole of it — nothing else about this spot is moving its
+                  score right now.
+                </p>
               ) : (
                 <p className="spot-plain">
                   No scoring notes came back for this spot — it is listed for reference only.

@@ -13,7 +13,16 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Airframe, Airline, Place, Provenance, RouteInfo, RunwayEnd, SpotLocation } from '../../shared/types.ts';
+import type {
+  Airframe,
+  Airline,
+  AirlineSource,
+  Place,
+  Provenance,
+  RouteInfo,
+  RunwayEnd,
+  SpotLocation,
+} from '../../shared/types.ts';
 import { CONFIG, log } from './config.ts';
 
 export type AirportRef = {
@@ -32,12 +41,17 @@ export type AirportRef = {
 /** Neutral slate used whenever an operator cannot be identified. */
 const UNKNOWN_COLOR = '#8A94A6';
 
-const UNKNOWN_AIRLINE: Airline = {
+/**
+ * The answer when nothing identified the operator — and the one anything weaker than an
+ * observation degrades to in a record that cannot carry its own provenance.
+ */
+export const UNKNOWN_AIRLINE: Airline = Object.freeze({
   icao: null,
   iata: null,
   name: 'Unknown',
   color: UNKNOWN_COLOR,
-};
+  source: 'unknown',
+});
 
 /* ------------------------------------------------------------------ *
  * Loading helpers
@@ -411,8 +425,8 @@ log.info(
  * Public API
  * ------------------------------------------------------------------ */
 
-function toAirline(row: AirlineRow): Airline {
-  return { icao: row.icao, iata: row.iata, name: row.name, color: row.color };
+function toAirline(row: AirlineRow, source: AirlineSource): Airline {
+  return { icao: row.icao, iata: row.iata, name: row.name, color: row.color, source };
 }
 
 function soleOperatorForPrefix(prefix: string): AirlineRow | null {
@@ -427,27 +441,44 @@ function soleOperatorForPrefix(prefix: string): AirlineRow | null {
  * Resolve the operator from the callsign's airline code, falling back to the airframe's
  * registration (exact fleet match first, then an unambiguous registration prefix). Returns a
  * neutral grey "Unknown" airline when nothing matches — never a guess dressed up as a fact.
+ *
+ * Every answer carries an `AirlineSource` saying which of those four things happened, because the
+ * last of them is materially weaker than the others. "This registration begins with G- and the
+ * only G-registered A380s in the fleet file are British Airways' " is a reasonable inference and a
+ * useless one to state as fact: a G-registered A380 that is *not* on the list — a lessor's frame,
+ * a repaint, a visitor — is precisely the aeroplane worth standing at the fence for. The UI can
+ * only mark that if the wire tells it, so the wire tells it.
  */
 export function getAirline(airlineIcao: string | null, registration: string | null): Airline {
   const code = str(airlineIcao)?.toUpperCase() ?? null;
   if (code !== null) {
     const row = AIRLINES.get(code);
-    if (row !== undefined) return toAirline(row);
+    // The aeroplane itself transmitted this. Nothing else here is that direct.
+    if (row !== undefined) return toAirline(row, 'callsign');
   }
 
   const reg = str(registration)?.toUpperCase() ?? null;
   if (reg !== null) {
     const frame = FLEET.byReg.get(reg);
     if (frame !== undefined) {
+      // The registration is in the curated fleet, which names this airframe's operator outright.
       const byOperator = frame.operatorIcao !== null ? AIRLINES.get(frame.operatorIcao) : undefined;
-      if (byOperator !== undefined) return toAirline(byOperator);
+      if (byOperator !== undefined) return toAirline(byOperator, 'fleet');
       if (frame.operator !== null) {
-        return { icao: frame.operatorIcao, iata: null, name: frame.operator, color: UNKNOWN_COLOR };
+        return {
+          icao: frame.operatorIcao,
+          iata: null,
+          name: frame.operator,
+          color: UNKNOWN_COLOR,
+          source: 'fleet',
+        };
       }
     }
 
+    // Neither the callsign nor the fleet knows this airframe. All that is left is the country
+    // prefix, and that is an inference about a class of aeroplanes, not about this one.
     const byPrefix = soleOperatorForPrefix(registrationPrefix(reg));
-    if (byPrefix !== null) return toAirline(byPrefix);
+    if (byPrefix !== null) return toAirline(byPrefix, 'registration_prefix');
   }
 
   return { ...UNKNOWN_AIRLINE };

@@ -99,8 +99,19 @@ export function StatusStrip(): ReactElement {
         <div className="strip-cell">
           <Stat label="At LHR" value={onGround} sub="on the ground" />
         </div>
+        {/*
+          Every A380 in the air anywhere is the app's largest fact and it was buried two taps
+          down, behind a segmented control on another tab. The number is the way in.
+        */}
         <div className="strip-cell">
-          <Stat label="Airborne" value={airborne} sub="worldwide" />
+          <a
+            className="strip-link"
+            href="#fleet/world"
+            aria-label={`${airborne} A380${airborne === 1 ? '' : 's'} airborne worldwide — open the world fleet`}
+          >
+            <Stat label="Airborne" value={airborne} sub="worldwide · view all" />
+            <Icon name="chevron" size={14} className="strip-link-chevron" />
+          </a>
         </div>
         <div className="strip-cell strip-cell--light">
           <Stat

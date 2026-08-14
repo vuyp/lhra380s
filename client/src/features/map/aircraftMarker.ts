@@ -24,21 +24,39 @@ export interface AircraftVisual {
   coasting: boolean;
 }
 
-/** Nose-up planform in a 64-unit box: nose at y=3, tail at y=60, span 4.3 → 59.7. */
+/**
+ * Nose-up planform in a 64-unit box, drawn to the A380-800's own proportions rather than to a
+ * generic airliner silhouette — this app is about one aeroplane and a spotter reads the shape
+ * before the label.
+ *
+ * Scale: 55.6 units ≈ 72.7 m of length, so one unit ≈ 1.31 m. What that buys, measured:
+ *
+ * | feature          | real          | drawn        |
+ * |------------------|---------------|--------------|
+ * | span ÷ length    | 79.8 ÷ 72.7 = 1.10 | 59.8 ÷ 55.6 = 1.08 |
+ * | fuselage width   | 7.1 m (0.098 L)    | 6.2 u (0.112 L)    |
+ * | tailplane span   | 30.4 m (0.38 span) | 22.8 u (0.38 span) |
+ * | engines          | four               | four               |
+ *
+ * The fuselage runs a little fat and the span a little short on purpose: at 44 px the whale has
+ * to survive a 1.6-unit outline on every shape, and a true-to-scale span would have put the
+ * wingtips through the edge of the icon box at some headings.
+ */
 const PLANFORM = [
-  // Fuselage — long, wide, tapered at both ends.
-  '<path class="map-plane-body" d="M32 3c2.3 0 3.4 4.8 3.4 9.6V46c0 6-.8 10.6-2 14.4h-2.8c-1.2-3.8-2-8.4-2-14.4V12.6C28.6 7.8 29.7 3 32 3Z"/>',
-  // Wings — swept, tips raked back.
-  '<path class="map-plane-body" d="M35.4 21 58.6 41.4c.7.6 1.1 1.5 1.1 2.4v1.4c0 .9-.9 1.5-1.8 1.2L35.4 39.2Z"/>',
-  '<path class="map-plane-body" d="M28.6 21 5.4 41.4c-.7.6-1.1 1.5-1.1 2.4v1.4c0 .9.9 1.5 1.8 1.2L28.6 39.2Z"/>',
-  // Tailplane.
-  '<path class="map-plane-body" d="M35.1 51.4l11.5 6.2c.5.3.8.8.8 1.3v.7c0 .6-.5 1-1.1.8l-11.2-3Z"/>',
-  '<path class="map-plane-body" d="M28.9 51.4 17.4 57.6c-.5.3-.8.8-.8 1.3v.7c0 .6.5 1 1.1.8l11.2-3Z"/>',
-  // Four engines, inboard pair ahead of the outboard pair.
-  '<rect class="map-plane-body" x="40.8" y="25.6" width="3.4" height="6.6" rx="1.7"/>',
-  '<rect class="map-plane-body" x="48.8" y="32.7" width="3.4" height="6.6" rx="1.7"/>',
-  '<rect class="map-plane-body" x="19.8" y="25.6" width="3.4" height="6.6" rx="1.7"/>',
-  '<rect class="map-plane-body" x="11.8" y="32.7" width="3.4" height="6.6" rx="1.7"/>',
+  // Fuselage — nose at y=4, constant section to y≈46, tail cone to y=59.6.
+  '<path class="map-plane-body" d="M32 4c1.9 2.3 3.1 6.2 3.1 10.8v30.8c0 6-.7 10.6-2 14H30.9c-1.3-3.4-2-8-2-14V14.8C28.9 10.2 30.1 6.3 32 4Z"/>',
+  // Wings — 37° of leading-edge sweep, raked tips, root chord from y=24.2 to y=38.8.
+  '<path class="map-plane-body" d="M35.1 24.2 60.8 43.2q1.4 1 .9 2.7-.5 1.3-2 .9L35.1 38.8Z"/>',
+  '<path class="map-plane-body" d="M28.9 24.2 3.2 43.2q-1.4 1-.9 2.7.5 1.3 2 .9L28.9 38.8Z"/>',
+  // Tailplane — deliberately small: an oversized one is the thing that makes an A380 read as a 747.
+  '<path class="map-plane-body" d="M34.4 49.8 42.8 55.2q.8.5.5 1.4-.3.7-1.2.5L34.4 54.8Z"/>',
+  '<path class="map-plane-body" d="M29.6 49.8 21.2 55.2q-.8.5-.5 1.4.3.7 1.2.5L29.6 54.8Z"/>',
+  // Four engines. Each nacelle straddles the leading edge at its own station, so the inboard pair
+  // sits ahead of the outboard pair — the giveaway that this is not a twin with the wick turned up.
+  '<rect class="map-plane-body" x="39.7" y="25.2" width="2.6" height="5.6" rx="1.3"/>',
+  '<rect class="map-plane-body" x="46.3" y="30.1" width="2.6" height="5.6" rx="1.3"/>',
+  '<rect class="map-plane-body" x="21.7" y="25.2" width="2.6" height="5.6" rx="1.3"/>',
+  '<rect class="map-plane-body" x="15.1" y="30.1" width="2.6" height="5.6" rx="1.3"/>',
 ].join('');
 
 const MARKER_BOX = 56;

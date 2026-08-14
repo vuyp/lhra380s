@@ -142,12 +142,28 @@ export function compassPoint(deg: number | null): string {
   return COMPASS[index] ?? DASH;
 }
 
+/**
+ * The three taxi phases have to read as three different amounts of knowledge.
+ *
+ * "Taxiing in" and "Taxiing out" are claims about where an aeroplane is going, and the tracker only
+ * makes them when it has watched something that says so. `taxi_unknown` is the case where it has
+ * not — which, on a cold start, is most of them.
+ *
+ * Its label is the bare verb, and that is the deliberate answer rather than a shortened one. It
+ * states the whole of what is known (this whale is taxiing) and none of what is not, and it is read
+ * beside its two siblings: a grey "Taxiing" sitting between a blue "Taxiing in" and an amber
+ * "Taxiing out" says *we have not established which* far more plainly than any parenthesis would,
+ * and it still fits in a chip on a phone in the sun. What it must never do is borrow one of their
+ * tones — a departure-coloured chip on a whale that has just landed is the same lie told in paint.
+ */
 const PHASE_LABELS: Record<FlightPhase, string> = {
   inbound: 'Inbound',
   approach: 'On approach',
   landed: 'Landed',
+  taxi_in: 'Taxiing in',
   stand: 'At stand',
   taxi_out: 'Taxiing out',
+  taxi_unknown: 'Taxiing',
   departing: 'Departing',
   climb_out: 'Climbing out',
   outbound: 'Outbound',
@@ -162,8 +178,10 @@ const PHASE_TONES: Record<FlightPhase, Tone> = {
   inbound: 'arrival',
   approach: 'live',
   landed: 'arrival',
+  taxi_in: 'arrival',
   stand: 'neutral',
   taxi_out: 'departure',
+  taxi_unknown: 'neutral',
   departing: 'departure',
   climb_out: 'departure',
   outbound: 'departure',

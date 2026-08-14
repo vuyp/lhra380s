@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import type { ReactElement } from 'react';
+import type { RunwayConfig } from '../../../shared/types.ts';
 import { useNow, useSnapshot } from '../api/useSnapshot.ts';
 import { compassPoint, formatClock, formatRelative } from '../lib/format.ts';
 import { useArrivalAlerts } from '../lib/notifications.ts';
@@ -60,7 +61,119 @@ function confidenceBadge(
   return null;
 }
 
-function RunwayConfigLine(): ReactElement {
+/**
+ * Which of the two parallel runways a designator names.
+ *
+ * Left and right are read from the flight deck, so they swap with the direction of use: pointing
+ * west along 27, left is the southern strip; pointing east along 09, left is the northern one.
+ * Same tarmac, opposite ends — which is the part "27L" never says out loud.
+ */
+function runwaySide(designator: string): 'northern' | 'southern' | null {
+  const match = /^(09|27)([LR])$/.exec(designator.trim().toUpperCase());
+  if (match === null) return null;
+  const heading = match[1];
+  const hand = match[2];
+  if (heading === '27') return hand === 'L' ? 'southern' : 'northern';
+  return hand === 'L' ? 'northern' : 'southern';
+}
+
+/** The one runway in a role, or null when the traffic named none or could not separate a pair. */
+function soleRunway(designators: string[] | undefined): string | null {
+  if (!Array.isArray(designators)) return null;
+  const cleaned = designators.filter(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0,
+  );
+  return cleaned.length === 1 ? (cleaned[0] ?? null) : null;
+}
+
+/**
+ * Where the aeroplanes physically are, each way round. Heathrow works into the wind, so westerly
+ * ops means arrivals from the east and departures to the west, and easterly ops is the mirror of
+ * it. Getting this backwards would send a reader to the wrong end of the airport.
+ */
+const GEOGRAPHY: Record<'westerly' | 'easterly', { arriving: string; departing: string }> = {
+  westerly: {
+    arriving: 'Aircraft come in from the east, over Hounslow and Hatton Cross.',
+    departing: 'Aircraft climb away to the west, out towards Windsor.',
+  },
+  easterly: {
+    arriving: 'Aircraft come in from the west, over Windsor and Datchet.',
+    departing: 'Aircraft climb away to the east, over Hatton Cross and Hounslow.',
+  },
+};
+
+/**
+ * The plain-English reading of the configuration, opened on demand from the header.
+ *
+ * "Landing 27L" is complete information to a spotter and nothing at all to the passenger standing
+ * next to them, so the expansion answers the two questions the code hides: which end of the
+ * airport, and which way the aeroplanes will be flying.
+ */
+function RunwayExplainer(p: { config: RunwayConfig; id: string }): ReactElement | null {
+  const { config, id } = p;
+  if (config.direction !== 'westerly' && config.direction !== 'easterly') return null;
+
+  const geography = GEOGRAPHY[config.direction];
+  const unconfirmed = isUnconfirmed(config.landing, config.departing);
+  const separator = unconfirmed ? ' or ' : ' and ';
+  const landing = runwayList(config.landing, separator);
+  const departing = runwayList(config.departing, separator);
+  if (landing === null && departing === null) return null;
+
+  const landingSole = soleRunway(config.landing);
+  const departingSole = soleRunway(config.departing);
+  const landingSide = landingSole === null ? null : runwaySide(landingSole);
+  const departingSide = departingSole === null ? null : runwaySide(departingSole);
+
+  return (
+    <div className="hdr-ops-explain" id={id}>
+      <ul className="hdr-explain-list">
+        {landing !== null ? (
+          <li className="hdr-explain-item">
+            <span className="hdr-explain-lead">
+              Landing on <b className="hdr-explain-runway app-numeric">{landing}</b>
+              {landingSide === null ? '' : `, the ${landingSide} runway`}.
+            </span>{' '}
+            {geography.arriving}
+          </li>
+        ) : null}
+        {departing !== null ? (
+          <li className="hdr-explain-item">
+            <span className="hdr-explain-lead">
+              Departing from <b className="hdr-explain-runway app-numeric">{departing}</b>
+              {departingSide === null ? '' : `, the ${departingSide} runway`}.
+            </span>{' '}
+            {geography.departing}
+          </li>
+        ) : null}
+      </ul>
+      {/*
+        The "or" above is the whole answer for a pair the traffic has not separated, and until now
+        it was explained only by the badge's `title` — which needs a mouse, and this app is read on
+        a phone. Same claim as that tooltip, in a sentence, where the reader who tapped for an
+        explanation is already looking.
+      */}
+      {unconfirmed ? (
+        <p className="hdr-explain-note">
+          Not enough traffic has been watched to separate the two parallel runways, so both are
+          named. We would rather show you the pair than pick one and be wrong.
+        </p>
+      ) : null}
+      <p className="hdr-explain-note">
+        A runway is numbered for the compass heading it points along — 27 is west, 09 is east — and
+        L and R tell the two parallel runways apart. Heathrow lands and departs into the wind, so
+        the direction changes with the weather.
+      </p>
+    </div>
+  );
+}
+
+function RunwayConfigLine(p: {
+  expanded: boolean;
+  onToggle: () => void;
+  panelId: string;
+}): ReactElement {
+  const { expanded, onToggle, panelId } = p;
   const { snapshot } = useSnapshot();
 
   if (!snapshot) {
@@ -83,39 +196,19 @@ function RunwayConfigLine(): ReactElement {
   const badge = confidenceBadge(config.confidence, config.sampleSize, unconfirmed);
   const known = config.direction !== 'unknown' && (landing !== null || departing !== null);
 
-  return (
-    <div className="hdr-ops-block">
-      <span className="hdr-ops-icon" aria-hidden="true">
-        <Icon name="runway" size={18} />
-      </span>
+  const spoken = (
+    <span className="app-visually-hidden">
+      {config.summary || 'Active runway configuration is not yet known.'}
+    </span>
+  );
 
-      {known ? (
-        <p className="hdr-ops-text">
-          {/*
-            The confidence badge rides on the direction's own line. As a sibling of this block
-            it wrapped onto a line of its own, and appearing or disappearing with the traffic
-            pushed the entire page down 30px and back — the header must never do that.
-          */}
-          <span className="hdr-ops-lead">
-            <span className="hdr-ops-direction">
-              {config.direction === 'westerly' ? 'Westerly ops' : 'Easterly ops'}
-            </span>
-            {badge ? (
-              <Chip tone={badge.tone} size="sm" title={badge.title}>
-                {badge.label}
-              </Chip>
-            ) : null}
-          </span>
-          <span className="hdr-ops-pair hdr-ops-pair--land">
-            <span className="hdr-ops-key">Landing</span>
-            <span className="hdr-ops-runway">{landing ?? 'unknown'}</span>
-          </span>
-          <span className="hdr-ops-pair hdr-ops-pair--dep">
-            <span className="hdr-ops-key">Departing</span>
-            <span className="hdr-ops-runway">{departing ?? 'unknown'}</span>
-          </span>
-        </p>
-      ) : (
+  // Nothing to expand until the traffic has told us which way the airport is working.
+  if (!known) {
+    return (
+      <div className="hdr-ops-block">
+        <span className="hdr-ops-icon" aria-hidden="true">
+          <Icon name="runway" size={18} />
+        </span>
         <p className="hdr-ops-text hdr-ops-text--unknown">
           <span className="hdr-ops-lead">
             Runway configuration not yet derived
@@ -127,12 +220,63 @@ function RunwayConfigLine(): ReactElement {
           </span>
           <span className="hdr-ops-note">too little low traffic to be sure</span>
         </p>
-      )}
+        {spoken}
+      </div>
+    );
+  }
 
-      <span className="app-visually-hidden">
-        {config.summary || 'Active runway configuration is not yet known.'}
+  // The control names itself with the server's own sentence rather than with the four fragments
+  // painted inside it, so a screen reader hears "Westerly operations — landing 27L, departing
+  // 27R" once, and hears what the control is for.
+  const spokenLabel = `${config.summary || `${config.direction} operations, landing ${landing ?? 'unknown'}, departing ${departing ?? 'unknown'}`}${
+    badge ? `. ${badge.label}` : ''
+  }. Explain this configuration`;
+
+  return (
+    <button
+      type="button"
+      className="hdr-ops-block hdr-ops-toggle"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-controls={panelId}
+      aria-label={spokenLabel}
+    >
+      <span className="hdr-ops-icon" aria-hidden="true">
+        <Icon name="runway" size={18} />
       </span>
-    </div>
+
+      <span className="hdr-ops-text">
+        {/*
+          The confidence badge rides on the direction's own line. As a sibling of this block
+          it wrapped onto a line of its own, and appearing or disappearing with the traffic
+          pushed the entire page down 30px and back — the header must never do that.
+        */}
+        <span className="hdr-ops-lead">
+          <span className="hdr-ops-direction">
+            {config.direction === 'westerly' ? 'Westerly ops' : 'Easterly ops'}
+          </span>
+          {badge ? (
+            <Chip tone={badge.tone} size="sm" title={badge.title}>
+              {badge.label}
+            </Chip>
+          ) : null}
+        </span>
+        <span className="hdr-ops-pair hdr-ops-pair--land">
+          <span className="hdr-ops-key">Landing</span>
+          <span className="hdr-ops-runway">{landing ?? 'unknown'}</span>
+        </span>
+        <span className="hdr-ops-pair hdr-ops-pair--dep">
+          <span className="hdr-ops-key">Departing</span>
+          <span className="hdr-ops-runway">{departing ?? 'unknown'}</span>
+        </span>
+      </span>
+
+      <Icon
+        name="chevron"
+        size={16}
+        className={expanded ? 'hdr-ops-chevron hdr-ops-chevron--open' : 'hdr-ops-chevron'}
+      />
+    </button>
   );
 }
 
@@ -435,7 +579,12 @@ const THEME_NAME: Record<Settings['theme'], string> = {
 
 export function AppHeader(): ReactElement {
   const { settings, update } = useSettings();
+  const { snapshot } = useSnapshot();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Progressive disclosure: the header stays a one-line instrument, and the plain-English
+  // reading of the runway configuration is one tap away for anyone who needs it.
+  const [opsOpen, setOpsOpen] = useState(false);
+  const opsPanelId = useId();
 
   const upcoming = nextTheme(settings.theme);
 
@@ -480,8 +629,17 @@ export function AppHeader(): ReactElement {
         </div>
 
         <div className="hdr-ops">
-          <RunwayConfigLine />
-          <WindLine />
+          <div className="hdr-ops-row">
+            <RunwayConfigLine
+              expanded={opsOpen}
+              onToggle={() => setOpsOpen((open) => !open)}
+              panelId={opsPanelId}
+            />
+            <WindLine />
+          </div>
+          {opsOpen && snapshot ? (
+            <RunwayExplainer config={snapshot.runwayConfig} id={opsPanelId} />
+          ) : null}
         </div>
 
         <ConnectionBanner />

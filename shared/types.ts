@@ -8,13 +8,24 @@
 export const AIRPORT_ICAO = 'EGLL';
 export const AIRPORT_IATA = 'LHR';
 
-/** Where an A380 sits in its relationship with Heathrow. See SPEC.md §5. */
+/**
+ * Where an A380 sits in its relationship with Heathrow. See SPEC.md §5.
+ *
+ * The three taxi phases exist because a moving aeroplane on the tarmac is the one place where
+ * guessing is easy and lying is easy with it. `taxi_in` and `taxi_out` are claims about direction
+ * and each has to be earned — a touchdown this app watched (or one in the persisted movement log)
+ * for the first, an observed stand dwell or a line-up on a runway for the second. When neither is
+ * available, which is the normal state of affairs on a cold start, the answer is `taxi_unknown`:
+ * on the move at Heathrow, direction not known. That is a deliberate answer, not a missing one.
+ */
 export type FlightPhase =
   | 'inbound'
   | 'approach'
   | 'landed'
+  | 'taxi_in'
   | 'stand'
   | 'taxi_out'
+  | 'taxi_unknown'
   | 'departing'
   | 'climb_out'
   | 'outbound'
@@ -43,6 +54,22 @@ export interface Telemetry {
   ageSeconds: number;
 }
 
+/**
+ * How the operator was identified. Two of these are things the app knows and two are not, and the
+ * UI may not render them alike:
+ *
+ *  - `callsign` — the aircraft transmitted an airline code we hold, e.g. "UAE1" → Emirates. An
+ *    observation.
+ *  - `fleet` — the transmitted registration is in the curated A380 fleet, which names its
+ *    operator. A published fact about that airframe.
+ *  - `registration_prefix` — nothing named the operator, but the registration's country prefix has
+ *    exactly one A380 operator in the fleet reference, so that one is inferred (G- → British
+ *    Airways). A decent guess, and it must be shown as a guess: a G-registered A380 that is not on
+ *    the list is exactly the aeroplane a spotter came out for.
+ *  - `unknown` — nothing identified the operator; `name` is "Unknown" and the colour is neutral.
+ */
+export type AirlineSource = 'callsign' | 'fleet' | 'registration_prefix' | 'unknown';
+
 export interface Airline {
   /** ICAO airline code parsed from the callsign, e.g. "UAE". */
   icao: string | null;
@@ -51,6 +78,8 @@ export interface Airline {
   name: string;
   /** Brand colour used for the accent bar. Hex, e.g. "#d71921". */
   color: string;
+  /** Where this identification came from. Never assume it is an observation. */
+  source: AirlineSource;
 }
 
 export interface Airframe {

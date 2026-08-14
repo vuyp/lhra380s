@@ -96,6 +96,12 @@
   color: var(--text-secondary);
 }
 
+.next-airline-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
 .next-line {
   display: flex;
   align-items: baseline;

@@ -132,13 +132,106 @@ function runwayCorners(runway: RunwayGeometry): L.LatLngTuple[] {
   return corners.map((point) => [point.lat, point.lon] as L.LatLngTuple);
 }
 
-/** Bounds covering both runways — used by the "recentre on Heathrow" control. */
+/**
+ * Bounds covering both runways with a little apron around them.
+ *
+ * This is the seed every automatic frame starts from, which is why the padding is modest: the
+ * frame gets its breathing room in pixels (see `framePadding`), and padding it twice put the
+ * airport in the middle of forty kilometres of Berkshire on a phone.
+ */
 export function airportBounds(): L.LatLngBounds {
   const points: L.LatLngTuple[] = [];
   for (const runway of RUNWAYS) {
     for (const end of runway.ends) points.push([end.lat, end.lon]);
   }
-  return L.latLngBounds(points).pad(1.6);
+  return L.latLngBounds(points).pad(0.35);
+}
+
+/* ---- Framing -------------------------------------------------------------------- */
+
+/**
+ * The zoom band automatic framing is allowed to use.
+ *
+ * The ceiling stops the map diving to street level when every whale is on stand and the bounds
+ * collapse to a few hundred metres of taxiway; the floor stops it retreating to an orbital view
+ * because one aeroplane the curated rotations claim for Heathrow is still over the Gulf. Outside
+ * the band the honest answer is "that one is off this view", which the caller says out loud,
+ * rather than a frame in which nothing can be read.
+ */
+const FRAME_MIN_ZOOM = 5;
+const FRAME_MAX_ZOOM = AIRPORT_ZOOM;
+
+/** Pixels along each edge that floating chrome is sitting on. Measured by the caller. */
+export interface FrameChrome {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/** No chrome at all — the default when a caller does not care. */
+const NO_CHROME: FrameChrome = { top: 0, right: 0, bottom: 0, left: 0 };
+
+/**
+ * Breathing room kept around a fitted frame, per side, in pixels.
+ *
+ * Asymmetric, because the chrome is: the control rail on the right, the tile attribution along
+ * the bottom, the status stack top-left, the legend bottom-left. A symmetric fit is what puts the
+ * inbound whale under the zoom buttons — visible only in the sense that its wingtip pokes out.
+ * The base is proportional to the viewport so a phone in landscape is not left with a keyhole,
+ * and capped so a desktop map is not mostly margin.
+ */
+function framePadding(map: L.Map, chrome: FrameChrome): FrameChrome {
+  const size = map.getSize();
+  const x = Math.round(Math.min(48, Math.max(16, size.x * 0.06)));
+  const y = Math.round(Math.min(48, Math.max(16, size.y * 0.08)));
+
+  // However much chrome is floating over the map, the aeroplanes get the majority of it.
+  const scaleX = Math.min(1, (size.x * 0.45) / Math.max(1, x * 2 + chrome.left + chrome.right));
+  const scaleY = Math.min(1, (size.y * 0.45) / Math.max(1, y * 2 + chrome.top + chrome.bottom));
+
+  return {
+    top: Math.round((y + chrome.top) * scaleY),
+    right: Math.round((x + chrome.right) * scaleX),
+    bottom: Math.round((y + chrome.bottom) * scaleY),
+    left: Math.round((x + chrome.left) * scaleX),
+  };
+}
+
+/** The airport, plus whatever aircraft the caller wants held in view. */
+function frameBounds(points: readonly L.LatLngTuple[]): L.LatLngBounds {
+  const bounds = airportBounds();
+  for (const point of points) bounds.extend(point);
+  return bounds;
+}
+
+/**
+ * Move the map to hold `points` and Heathrow, within the zoom band and clear of the chrome.
+ *
+ * `fitBounds` cannot express a minimum zoom, so the zoom is computed and clamped here and applied
+ * with `setView`. That means doing what `fitBounds` does internally: `getBoundsZoom` takes the
+ * *total* padding rather than the per-side figure, and uneven padding is applied by shifting the
+ * centre by half the difference.
+ */
+export function applyFrame(
+  map: L.Map,
+  points: readonly L.LatLngTuple[],
+  options: { animate: boolean; chrome?: FrameChrome },
+): void {
+  const bounds = frameBounds(points);
+  const pad = framePadding(map, options.chrome ?? NO_CHROME);
+  const total = L.point(pad.left + pad.right, pad.top + pad.bottom);
+  const zoom = Math.min(
+    FRAME_MAX_ZOOM,
+    Math.max(FRAME_MIN_ZOOM, map.getBoundsZoom(bounds, false, total)),
+  );
+
+  const southWest = map.project(bounds.getSouthWest(), zoom);
+  const northEast = map.project(bounds.getNorthEast(), zoom);
+  const offset = L.point(pad.right - pad.left, pad.bottom - pad.top).divideBy(2);
+  const centre = map.unproject(southWest.add(northEast).divideBy(2).add(offset), zoom);
+
+  map.setView(centre, zoom, { animate: options.animate });
 }
 
 type RunwayRole = 'landing' | 'departing' | 'idle';
@@ -316,7 +409,29 @@ export interface SpotOverlay {
    * anonymous pin among eleven.
    */
   markerFor(spotId: string): L.Marker | null;
+  /**
+   * Tell the popups how much of the map is covered by our own floating chrome.
+   *
+   * Leaflet keeps an opening popup inside the *container*, which is the wrong rectangle: on a
+   * phone the status stack, the framing chip and the empty-state card occupy the top-left third
+   * of that container, and a popup opened under them is simply invisible. Feeding the measured
+   * insets in as auto-pan padding makes Leaflet pan the map until the card clears them.
+   *
+   * `mapHeight` caps the card itself. A spot popup is 368 px of briefing and the map on a 390 px
+   * phone is 440 px tall, so at full height it hung out of the top of the canvas and under the
+   * app header however well it was panned. Capped, Leaflet scrolls the overflow inside the card.
+   *
+   * Returns the cap that was applied, which is how tall the card may now be — the caller needs it
+   * to place the pin itself when it is opening one deliberately.
+   */
+  setChrome(chrome: FrameChrome, mapHeight: number): number;
 }
+
+/** The tallest a spot card is ever allowed to be, and the least it is worth shrinking to. */
+const SPOT_POPUP_MAX_HEIGHT = 380;
+const SPOT_POPUP_MIN_HEIGHT = 170;
+/** The pin, the card's tip and its shadow, which sit below the scrollable body. */
+const SPOT_POPUP_TAIL = 56;
 
 /**
  * A pin per spotting location, rated for right now. Hover shows the name, tap opens a card with
@@ -325,6 +440,29 @@ export interface SpotOverlay {
 export function createSpotOverlay(options: { onOpenSpot: (spot: SpotLocation) => void }): SpotOverlay {
   const layer = L.layerGroup();
   const markers = new Map<string, L.Marker>();
+  /** Latest measured chrome, applied to every popup as it is bound and whenever it changes. */
+  let chrome: FrameChrome = NO_CHROME;
+  let popupMaxHeight = SPOT_POPUP_MAX_HEIGHT;
+
+  /** Leaflet reads these when the popup opens, so they must be set before `openPopup()`. */
+  const applyChrome = (marker: L.Marker): void => {
+    const popup = marker.getPopup();
+    if (!popup) return;
+    const gap = 16;
+    popup.options.autoPanPaddingTopLeft = L.point(chrome.left + gap, chrome.top + gap);
+    popup.options.autoPanPaddingBottomRight = L.point(chrome.right + gap, chrome.bottom + gap);
+    popup.options.maxHeight = popupMaxHeight;
+  };
+
+  const setChrome = (next: FrameChrome, mapHeight: number): number => {
+    chrome = next;
+    const room = mapHeight - next.top - next.bottom - SPOT_POPUP_TAIL;
+    popupMaxHeight = Math.round(
+      Math.min(SPOT_POPUP_MAX_HEIGHT, Math.max(SPOT_POPUP_MIN_HEIGHT, room)),
+    );
+    for (const marker of markers.values()) applyChrome(marker);
+    return popupMaxHeight;
+  };
 
   const update = (spots: readonly SpotEvaluation[]): void => {
     layer.clearLayers();
@@ -359,9 +497,10 @@ export function createSpotOverlay(options: { onOpenSpot: (spot: SpotLocation) =>
       });
 
       marker.addTo(layer);
+      applyChrome(marker);
       if (typeof evaluation.spot.id === 'string') markers.set(evaluation.spot.id, marker);
     }
   };
 
-  return { layer, update, markerFor: (spotId) => markers.get(spotId) ?? null };
+  return { layer, update, markerFor: (spotId) => markers.get(spotId) ?? null, setChrome };
 }

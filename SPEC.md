@@ -76,6 +76,10 @@ Scripts (root `package.json`): `npm run dev` (server + vite concurrently), `npm 
   carrying `phase`, `eta`, `route`, `runway`, and live telemetry.
 - `RunwayConfig` — which runways are landing/departing right now, derived from observed traffic.
 - `SpotEvaluation` — a spotting location scored for the current config and sun position.
+- `Airline` — the operator, carrying an `AirlineSource` for **how it was identified**. This is part
+  of the contract, not a hint: `callsign` and `fleet` are matches against something the aeroplane
+  transmitted, `registration_prefix` is an inference from the country prefix, and `unknown` is
+  nothing at all. The UI must not render the third like the first two (see §5).
 
 ## 5. Domain rules (implement exactly)
 
@@ -89,13 +93,30 @@ Runways: `09L/27R` (thresholds 09L `51.4775,-0.4845` / 27R `51.4779,-0.4334`) an
 |---|---|
 | `inbound` | airborne, converging on LHR (closing distance, bearing-to-LHR within ~55° of track), >25 nm out, and passing the arrival test below |
 | `approach` | airborne, within 25 nm, descending or below 6 000 ft, aligned with an LHR runway |
-| `landed` | was `approach`, now on ground within the airport polygon |
-| `stand` | on ground at LHR, groundspeed < 3 kt for > 3 min |
-| `taxi_out` | on ground at LHR, moving, after having been at a stand |
+| `landed` | was `approach`, now on ground within the airport polygon — the touchdown and the roll-out that follows it |
+| `taxi_in` | on ground at LHR, taxiing (≤ 40 kt), after a touchdown **this app observed** — either in this session or in the persisted movement log, with nothing logged since |
+| `stand` | on ground at LHR, groundspeed < 3 kt for > 3 min, and not lined up on a runway |
+| `taxi_out` | on ground at LHR, moving, after an observed stand dwell — or lined up on a runway pointing down it |
+| `taxi_unknown` | on ground at LHR, moving, and none of the above applies |
 | `departing` | on ground, groundspeed > 60 kt, on a runway centreline, **and accelerating** — a landing roll-out is the same picture in a single frame, so the previous report must not have been airborne and the aircraft must not be inside the turnaround that follows its own logged touchdown |
 | `climb_out` | airborne, within 30 nm, climbing, departed LHR in this session |
 | `outbound` | airborne, diverging from LHR, last seen departing LHR (keep for 90 min) |
 | `elsewhere` | any other A380 in the world — powers the global fleet view |
+
+**Which way is it taxiing.** A moving A380 on the tarmac is where guessing is easiest, so the
+direction has to be earned and there are three answers, not two. `taxi_in` needs a touchdown the app
+can point at; `taxi_out` needs an observed three-minute stand dwell, or the aircraft sitting in the
+first half mile of a runway aligned with its take-off direction at taxi speed — a position nothing
+arriving is ever slow in. When neither is available, which is the *usual* case on a cold start or on
+first contact with an airframe already on the ground, the answer is `taxi_unknown` and the app says
+so: neutral tone, no direction in the label, no departure runway, and the ground board rather than
+departures. It is a deliberate answer, not a missing one. Guessing here produced the worst thing
+this app has ever printed — a whale that had just landed, announced as "Taxiing out".
+
+Runway proximity is deliberately *not* used to break the tie, because at Heathrow it cannot: under
+westerlies a 27R arrival rolls out to the west end and vacates where the departure queue stands when
+the airport is on easterlies, and the taxi in from a landing runs along the same taxiways in the
+same direction as the taxi out to the hold.
 
 **The arrival test.** "Closing and pointing this way" is not sufficient, and building it that way
 put overflights on the board: Emirates DXB–JFK, Lufthansa FRA–LAX and Qatar DOH–IAD all cross
@@ -148,6 +169,21 @@ e.g. `UAE1` → DXB–LHR). If no match, infer direction from the great-circle t
 origin/destination as `unknown` — **never fabricate a city**. Every inferred field carries
 `source: 'schedule' | 'inferred' | 'unknown'` so the UI can mark it honestly.
 
+**Operator identification** is resolved in that order — the callsign's airline code, then an exact
+registration match in the curated fleet, then the registration's country prefix when exactly one
+A380 operator on file uses it (G- → British Airways) — and `Airline.source` records which one
+answered. The prefix inference is a reasonable guess and a bad fact, because the A380 that is *not*
+on the list is exactly the one worth coming out for, so it reaches the client marked as inferred and
+the UI qualifies it — in the same word, wherever the name appears. When nothing matches the operator
+is "Unknown" in neutral grey, never a guess.
+
+The same rule as the runway above governs where that name may be *written*: `LoggedMovement` and
+`GlobalAircraft` carry the operator as a bare string with no provenance beside it, so only a
+`callsign` or `fleet` identification may fill them. A prefix inference degrades to "Unknown" there —
+permanently, in the log's case — rather than becoming a fact the UI has no way to qualify. In the
+world fleet that also sorts the unlisted airframe into its own group instead of hiding it inside an
+airline's.
+
 **Sun position** (for photography advice) is computed locally with a standard NOAA solar-position
 algorithm — no network, no library.
 
@@ -156,8 +192,14 @@ algorithm — no network, no library.
 Four tabs, mobile bottom bar / desktop side rail:
 
 1. **Board** — the hero. Next-arrival countdown at the top, then arrival cards, then departures.
-2. **Map** — Leaflet + CARTO tiles, LHR-centred, live aircraft with heading-rotated icons, trails,
-   runway overlay showing the live config, spot pins.
+2. **Map** — Leaflet + CARTO tiles, live aircraft with heading-rotated icons, trails, runway
+   overlay showing the live config, spot pins. The opening view is **framed on Heathrow plus the
+   A380s that have a relationship with it**, not centred on the airport: a reader arriving from a
+   countdown must not find their whale thirty miles off the edge. The near field sets the scale,
+   anything left outside it is said out loud rather than silently dropped, and the moment the
+   reader pans, pinches or zooms, automatic framing stops until they ask for it back. Another tab
+   may hand the map one named thing — a spotting location, or an airframe from the fleet browser —
+   and that hand-over outranks the framing: the map goes there, says so, and stays.
 3. **Spots** — spotting locations ranked *for right now* (active runways, sun, wind), with what
    you'll see, how to get there, and sun/light quality.
 4. **Fleet** — today's movement log + the A380 world fleet reference (who flies the whale, which

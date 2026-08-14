@@ -105,6 +105,15 @@
   text-overflow: ellipsis;
 }
 
+/*
+ * An operator worked out from the registration is marked where the name is, not only below it.
+ * The tag itself is `.app-inferred-tag`, shared with the board card and the hero; only the gap
+ * from the name is local, because this one sits inside a line of running text.
+ */
+.det-head-operator-tag {
+  margin-inline-start: var(--space-2);
+}
+
 .det-head-title {
   margin-top: 2px;
   font-size: var(--text-2xl);
@@ -188,6 +197,22 @@
   font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--text-secondary);
+}
+
+/*
+ * A caveat, not a warning: it is marked so the eye finds it, in the neutral line colour rather
+ * than in amber. Nothing has gone wrong — we are saying how much we actually know.
+ */
+.det-note--caution {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-inline-start: 3px solid var(--text-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--surface-3) 60%, transparent);
+}
+
+.det-note--caution strong {
+  color: var(--text);
 }
 
 .det-facts {

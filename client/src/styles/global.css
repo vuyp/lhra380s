@@ -223,6 +223,24 @@ hr {
   -webkit-overflow-scrolling: touch;
 }
 
+/*
+ * The one word that separates something we read from something we worked out. It is deliberately
+ * quiet — outlined, muted, never a brand colour — and deliberately identical everywhere it
+ * appears, so the board card, the hero and the detail sheet mark an inference in the same voice.
+ */
+.app-inferred-tag {
+  flex: none;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

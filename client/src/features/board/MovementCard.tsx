@@ -9,6 +9,8 @@
 
 import type { ReactElement } from 'react';
 import type {
+  Airline,
+  FlightPhase,
   Movement,
   MovementKind,
   Place,
@@ -21,6 +23,7 @@ import { useSettings } from '../../state/settings.tsx';
 import { Card } from '../../components/ui/Card.tsx';
 import { Chip } from '../../components/ui/Chip.tsx';
 import { Icon } from '../../components/ui/Icon.tsx';
+import type { IconName } from '../../components/ui/Icon.tsx';
 import {
   compassPoint,
   formatAltitude,
@@ -42,6 +45,31 @@ export const STALE_AFTER_SECONDS = 45;
 /** Flight number if the callsign resolved to one, else the raw callsign, else the honest gap. */
 export function flightTitle(movement: Movement): string {
   return movement.flightNumber ?? movement.callsign ?? 'No callsign';
+}
+
+/**
+ * The operator's name, plus the one word that says when it was worked out rather than read.
+ *
+ * `callsign` and `fleet` are identifications the app made from something the aeroplane
+ * transmitted; `registration_prefix` is an inference about every A380 sharing a country prefix,
+ * and printing it in the same voice as the other two is exactly what the wire's provenance field
+ * exists to prevent. The tag is the whole of it here — the detail sheet gives the reason in full,
+ * in the same word, so the two never read as different claims.
+ */
+export function OperatorName(p: { airline: Airline; className: string }): ReactElement {
+  return (
+    <span className={p.className}>
+      <span className={`${p.className}-name`}>{p.airline.name}</span>
+      {p.airline.source === 'registration_prefix' ? (
+        <span
+          className="app-inferred-tag"
+          title="Worked out from the registration prefix, not from anything this aircraft transmitted"
+        >
+          inferred
+        </span>
+      ) : null}
+    </span>
+  );
 }
 
 /** Best human name we hold for a place. Never invents one. */
@@ -98,8 +126,17 @@ function confidenceWord(confidence: number): string {
   return 'low confidence';
 }
 
-/** A runway prediction, described as a prediction — never as fact. */
-export function runwayHint(runway: RunwayPrediction): {
+/**
+ * A runway prediction, described as a prediction — never as fact.
+ *
+ * `where` only changes what we say when there is no runway at all: "not enough of the approach
+ * flown" is the reason in the air and nonsense on the tarmac, where the real answer is that
+ * nothing was watched landing or lining up.
+ */
+export function runwayHint(
+  runway: RunwayPrediction,
+  where: 'air' | 'ground' = 'air',
+): {
   label: string;
   /** One short line for a stat caption. */
   short: string;
@@ -107,6 +144,13 @@ export function runwayHint(runway: RunwayPrediction): {
   detail: string;
 } {
   if (!runway.runway) {
+    if (where === 'ground') {
+      return {
+        label: DASH,
+        short: 'none claimed',
+        detail: 'No runway claimed — we did not watch this aircraft land or line up',
+      };
+    }
     return {
       label: 'TBC',
       short: 'not predictable yet',
@@ -199,6 +243,38 @@ function flightCells(
 }
 
 /**
+ * The runway cell for an aircraft on the tarmac, which is three different questions.
+ *
+ * A whale on its way out is asking which runway it will use; one that has landed is asking which
+ * one it used; and a `taxi_unknown` is not asking either, because the direction of travel has not
+ * been earned. Printing "Landing runway —" over that last case reads as a value we lost, and
+ * printing a departure runway would be the guess this app refuses to make.
+ */
+function groundRunwayCell(
+  movement: Movement,
+  runway: { label: string; detail: string },
+): TelemetryCell {
+  if (movement.phase === 'taxi_out') {
+    return { term: 'Departure runway', value: runway.label, title: runway.detail };
+  }
+  if (movement.runway.source === 'observed' && movement.runway.runway !== null) {
+    return { term: 'Landing runway', value: runway.label, title: runway.detail };
+  }
+  if (movement.phase === 'taxi_unknown') {
+    return {
+      term: 'Runway',
+      value: DASH,
+      title: 'Neither runway is claimed until we have seen this aircraft land or line up',
+    };
+  }
+  return {
+    term: 'Landing runway',
+    value: DASH,
+    title: 'Not observed — the touchdown was not seen from a position we could read a runway from',
+  };
+}
+
+/**
  * A whale parked at Heathrow, described by facts that are actually about a parked whale.
  *
  * The airborne set reused here read "On ground · 0 kt · 0.7 nm ENE · runway TBC" — four cells
@@ -232,14 +308,7 @@ function groundCells(
       ? { term: 'Landed', value: formatClock(landedAt) }
       : { term: 'Landed', value: 'not observed', title: 'It was already on the ground when we picked it up' };
 
-  const observedRunway = movement.runway.source === 'observed' && movement.runway.runway !== null;
-  const runwayCell: TelemetryCell = observedRunway
-    ? { term: 'Landing runway', value: runway.label, title: runway.detail }
-    : {
-        term: 'Landing runway',
-        value: DASH,
-        title: 'Not observed — the touchdown was not seen from a position we could read a runway from',
-      };
+  const runwayCell = groundRunwayCell(movement, runway);
 
   const where: TelemetryCell = moving
     ? { term: 'Taxi speed', value: formatSpeed(movement.telemetry.groundSpeed, units) }
@@ -255,6 +324,23 @@ function groundCells(
   return [since, landed, runwayCell, where];
 }
 
+/**
+ * The arrow beside the route is a claim about which way this aeroplane is going, so it is drawn
+ * from the phase rather than from the board it happens to be on. A whale taxiing with no
+ * established direction gets the plain planform: neutral, and neither arrow.
+ */
+const GROUND_ROUTE_ICON: Record<string, IconName> = {
+  landed: 'arrival',
+  taxi_in: 'arrival',
+  taxi_out: 'departure',
+};
+
+function routeIcon(kind: MovementKind, phase: FlightPhase): IconName {
+  if (kind === 'departure') return 'departure';
+  if (kind === 'arrival') return 'arrival';
+  return GROUND_ROUTE_ICON[phase] ?? 'plane';
+}
+
 export function MovementCard(p: { movement: Movement; now: number }): ReactElement {
   const { movement, now } = p;
   const { settings } = useSettings();
@@ -264,7 +350,10 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
   const { telemetry, route, kind } = movement;
   const age = positionAgeSeconds(movement, lastUpdate, now);
   const stale = movement.coasting || age >= STALE_AFTER_SECONDS;
-  const runway = runwayHint(movement.runway);
+  const runway = runwayHint(
+    movement.runway,
+    kind === 'ground' || telemetry.onGround ? 'ground' : 'air',
+  );
   const ends = routeEnds(route, kind);
   const registration = movement.airframe.registration;
   const note = movement.airframe.note;
@@ -285,6 +374,7 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
       : flightCells(movement, settings.units, runway);
 
   const vertical = telemetry.onGround ? null : formatVerticalRate(telemetry.verticalRate);
+  const undirected = movement.phase === 'taxi_unknown';
   // The title already falls back to the callsign, so only show it again when it adds something.
   const title = flightTitle(movement);
   const secondaryCallsign = movement.callsign !== null && movement.callsign !== title;
@@ -306,7 +396,7 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
               </span>
             ) : null}
           </span>
-          <span className="mv-airline">{movement.airline.name}</span>
+          <OperatorName airline={movement.airline} className="mv-airline" />
         </div>
 
         <div className="mv-status">
@@ -334,11 +424,7 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
       </div>
 
       <p className={ends ? 'mv-route' : 'mv-route mv-route--unknown'}>
-        <Icon
-          name={kind === 'departure' ? 'departure' : 'arrival'}
-          size={16}
-          className="mv-route-icon"
-        />
+        <Icon name={routeIcon(kind, movement.phase)} size={16} className="mv-route-icon" />
         {ends ? (
           <span className="mv-route-text">
             <span className="mv-place">{ends.from}</span>
@@ -350,7 +436,21 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
         ) : (
           <span className="mv-route-text">{routeLabel(route, kind)}</span>
         )}
-        {route.source === 'inferred' ? (
+        {/*
+          An unnamed city is a decision, not a hole. Most A380s now transmit a suffixed
+          operational callsign that matches no curated rotation, so "Origin unknown" is the
+          honest end of the search — and the chip says we stopped there on purpose. The card
+          opens the detail sheet, where the Route block explains why in full. One chip at a
+          time: with no city named there is nothing for "inferred" to qualify.
+        */}
+        {!ends ? (
+          <Chip
+            size="sm"
+            title="No rotation on file matches this callsign, so we name no city — open the aircraft for why"
+          >
+            not guessed
+          </Chip>
+        ) : route.source === 'inferred' ? (
           <Chip size="sm" title="Direction inferred from the track, not from a schedule">
             inferred
           </Chip>
@@ -378,7 +478,7 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
         ))}
       </dl>
 
-      {stale || vertical !== null ? (
+      {stale || vertical !== null || undirected ? (
         <p className="mv-foot">
           {stale ? (
             <Chip
@@ -388,6 +488,16 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
             >
               {movement.coasting ? 'Coasting' : 'Stale'} · {formatAge(age)} old
             </Chip>
+          ) : null}
+          {/*
+            The chip above this card says "Taxiing" where its neighbours say "Taxiing in" and
+            "Taxiing out", and the difference is the whole point: say why in words rather than
+            leaving the reader to notice a missing preposition.
+          */}
+          {undirected ? (
+            <span className="mv-undirected">
+              Direction not established — we did not watch it land or line up
+            </span>
           ) : null}
           {vertical !== null ? <span className="mv-vertical app-numeric">{vertical}</span> : null}
         </p>

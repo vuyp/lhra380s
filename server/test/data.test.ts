@@ -235,6 +235,66 @@ describe('data/fleet.json', () => {
   });
 });
 
+/**
+ * An operator we read off the callsign and an operator we guessed from a registration prefix used
+ * to arrive on the wire looking identical, so the UI rendered them identically. "G- registered
+ * A380s in our fleet file are all British Airways, therefore this one is" is a fair inference and a
+ * bad fact: the whole point of standing at the fence is the airframe that is *not* on the list.
+ */
+describe('an operator says how it was identified', () => {
+  it('marks a callsign match as coming from the callsign', () => {
+    const airline = getAirline('UAE', 'A6-EUA');
+    assert.equal(airline.name, 'Emirates');
+    assert.equal(airline.source, 'callsign');
+  });
+
+  it('marks a curated fleet match as coming from the fleet', () => {
+    // No airline code in the callsign — but this exact registration is in the fleet reference.
+    const airline = getAirline(null, 'A6-EUA');
+    assert.equal(airline.name, 'Emirates');
+    assert.equal(airline.source, 'fleet');
+
+    // Same, when the callsign carried a code we simply do not hold.
+    assert.equal(getAirline('ZZZ', 'G-XLEA').source, 'fleet');
+    assert.equal(getAirline('ZZZ', 'G-XLEA').name, 'British Airways');
+  });
+
+  it('marks a registration-prefix guess as a guess', () => {
+    // Not in the fleet, no airline code — G- has exactly one A380 operator on file, so the
+    // inference is made, and it is labelled as an inference.
+    const airline = getAirline(null, 'G-ZZZA');
+    assert.equal(airline.name, 'British Airways');
+    assert.equal(airline.source, 'registration_prefix');
+  });
+
+  it('infers nothing at all when the prefix does not name one operator', () => {
+    // A6- is Emirates *and* Etihad, so there is no single answer and none is invented.
+    const ambiguous = getAirline(null, 'A6-ZZZA');
+    assert.equal(ambiguous.name, 'Unknown');
+    assert.equal(ambiguous.source, 'unknown');
+
+    // Nothing whatsoever to go on.
+    assert.equal(getAirline(null, null).source, 'unknown');
+    assert.equal(getAirline(null, 'N380XX').source, 'unknown');
+  });
+
+  it('never dresses a guess in a brand colour without saying so', () => {
+    for (const [code, registration] of [
+      ['UAE', 'A6-EUA'],
+      [null, 'A6-EUA'],
+      [null, 'G-ZZZA'],
+      [null, null],
+    ] as Array<[string | null, string | null]>) {
+      const airline = getAirline(code, registration);
+      assert.match(airline.color, /^#[0-9A-Fa-f]{6}$/, `${String(code)}/${String(registration)} has no colour`);
+      assert.ok(
+        ['callsign', 'fleet', 'registration_prefix', 'unknown'].includes(airline.source),
+        `${String(code)}/${String(registration)} carries no provenance`,
+      );
+    }
+  });
+});
+
 describe('data/airlines.json', () => {
   it('gives every operator a name and a real brand colour', () => {
     for (const [icao, airline] of Object.entries(airlines)) {

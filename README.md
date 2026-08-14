@@ -67,6 +67,22 @@ the aeroplane's own behaviour corroborates it. Once confirmed an arrival is stic
 holds do not drop it off the board. Both halves of this are replayed in the test suite against
 recorded tracks of a real arrival and a real overflight.
 
+**Which way it is taxiing — three answers, not two.** A moving A380 on the tarmac is where guessing
+is easiest and worst: the app once announced a whale that had just landed as *"Taxiing out"*, in
+departure colours. Direction now has to be earned — a touchdown the app watched (or one in the
+persisted log) for *taxiing in*, an observed three-minute stand dwell or a line-up on a runway for
+*taxiing out*. When neither exists, which is the normal state on a cold start, the phase is
+`taxi_unknown`: the chip says *"Taxiing"*, no direction, no runway, the ground board rather than
+departures, and a line of text saying why. It is a deliberate answer, not a missing one.
+
+**Operators say how they were identified.** The callsign's airline code and an exact registration
+match in the curated fleet are things the app read. A registration *prefix* — "every G- registered
+A380 on file is British Airways, so this one is" — is an inference, and the A380 that is not on the
+list is exactly the aeroplane worth coming out for. So the wire carries an `AirlineSource`, the
+board and the detail sheet mark the inference in the same word, and the two records that have
+nowhere to carry a caveat — the permanent movement log and the world-fleet list — decline to state
+it at all.
+
 **Smoothed countdowns.** ETAs are exponentially smoothed so the number counts down instead of
 flickering, and absurd values collapse to `—` rather than rendering a lie to the minute.
 
@@ -103,9 +119,10 @@ No configuration, no keys, no database. Movement history is appended to a JSONL 
 
 ```bash
 npm run typecheck  # strict TS across server and client
-npm test           # 192 server tests: geo, sun, runway derivation, the HTTP and SSE layer,
-                   # upstream failure handling, and the arrival classifier replayed against
-                   # recorded ADS-B tracks of a real arrival and a real overflight
+npm test           # 211 server tests: geo, sun, runway derivation, the HTTP and SSE layer,
+                   # upstream failure handling, taxi-direction and operator provenance, and the
+                   # arrival classifier replayed against recorded ADS-B tracks of a real arrival
+                   # and a real overflight
 ```
 
 ## Layout

@@ -9,7 +9,7 @@
 
 import { useRef } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
-import type { Movement, Snapshot } from '../../../../shared/types.ts';
+import type { FlightPhase, Movement, Snapshot } from '../../../../shared/types.ts';
 import { useSnapshot } from '../../api/useSnapshot.ts';
 import { useSelection } from '../../state/selection.tsx';
 import { useSettings } from '../../state/settings.tsx';
@@ -30,6 +30,7 @@ import {
   routeLabel,
 } from '../../lib/format.ts';
 import {
+  OperatorName,
   STALE_AFTER_SECONDS,
   flightTitle,
   formatAge,
@@ -43,6 +44,27 @@ import './NextWhale.css';
 /** Heathrow's aerodrome reference point — SPEC §5. */
 const LHR = { lat: 51.4706, lon: -0.4619 };
 const KM_PER_NM = 1.852;
+
+/** Every phase that is on the tarmac. None of them has a countdown to a touchdown. */
+const GROUND_PHASES: ReadonlySet<FlightPhase> = new Set<FlightPhase>([
+  'landed',
+  'taxi_in',
+  'stand',
+  'taxi_out',
+  'taxi_unknown',
+]);
+
+/**
+ * What the approach rail says once the wheels are down. "Taxiing in" is a claim about direction
+ * and only two of these phases have earned it — the rest say where the aircraft is and stop.
+ */
+const GROUND_LINE: Record<string, string> = {
+  landed: 'On the ground at Heathrow — rolling out',
+  taxi_in: 'On the ground at Heathrow — taxiing in',
+  stand: 'On stand at Heathrow',
+  taxi_out: 'On the ground at Heathrow — taxiing out',
+  taxi_unknown: 'On the ground at Heathrow — taxiing, direction not established',
+};
 
 /** Distance to Heathrow, in nautical miles, of the oldest position we still hold for a flight. */
 function trailStartNm(movement: Movement): number | null {
@@ -154,9 +176,16 @@ function IdleWhale(p: { snapshot: Snapshot; now: number }): ReactElement {
           <Icon name="binoculars" size={16} />
           Find a spot for the current runways
         </a>
-        <a className="next-idle-link" href="#fleet">
+        {/* The world fleet is the answer to a quiet Heathrow, so it gets its own way in. */}
+        <a className="next-idle-link" href="#fleet/world">
           <Icon name="fleet" size={16} />
-          Browse today's log and the world fleet
+          {airborne > 0
+            ? `See ${airborne} A380${airborne === 1 ? '' : 's'} airborne worldwide`
+            : 'Browse the world A380 fleet'}
+        </a>
+        <a className="next-idle-link" href="#fleet/log">
+          <Icon name="clock" size={16} />
+          Today's movement log
         </a>
       </nav>
     </article>
@@ -175,15 +204,20 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
   if (!movement) return <IdleWhale snapshot={snapshot} now={now} />;
 
   const { telemetry } = movement;
-  const runway = runwayHint(movement.runway);
+  const runway = runwayHint(movement.runway, telemetry.onGround ? 'ground' : 'air');
   const ends = routeEnds(movement.route, movement.kind);
   const age = positionAgeSeconds(movement, lastUpdate, now);
   const stale = movement.coasting || age >= STALE_AFTER_SECONDS;
-  const down = movement.phase === 'landed' || movement.phase === 'stand';
+  const down = GROUND_PHASES.has(movement.phase);
   const touchedDownAt = movement.actualAt ?? movement.lastSeen;
 
   const countdown = down ? formatClock(touchedDownAt) : formatCountdown(movement.eta.minutes);
-  const countdownLabel = down ? 'Touched down' : 'Touchdown in';
+  // Only a touchdown this app watched may be called one; otherwise all we have is a last fix.
+  const countdownLabel = down
+    ? movement.actualAt !== null
+      ? 'Touched down'
+      : 'Last seen'
+    : 'Touchdown in';
   const countdownSub = down
     ? formatRelative(touchedDownAt, now)
     : movement.eta.at !== null
@@ -191,7 +225,9 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
       : 'ETA unavailable';
 
   const spoken = down
-    ? `${flightTitle(movement)} has landed`
+    ? movement.actualAt !== null
+      ? `${flightTitle(movement)} has landed`
+      : `${flightTitle(movement)} is on the ground at Heathrow`
     : movement.eta.minutes !== null
       ? `${flightTitle(movement)} lands in ${formatCountdown(movement.eta.minutes)}`
       : `${flightTitle(movement)} inbound, arrival time unavailable`;
@@ -202,7 +238,11 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
     <article className="next" style={accent}>
       <header className="next-head">
         <h2 className="next-eyebrow app-eyebrow">
-          {down ? 'Just landed at Heathrow' : 'Next whale into Heathrow'}
+          {!down
+            ? 'Next whale into Heathrow'
+            : movement.actualAt !== null
+              ? 'Just landed at Heathrow'
+              : 'On the ground at Heathrow'}
         </h2>
         <Chip tone={phaseTone(movement.phase)} size="sm">
           {phaseLabel(movement.phase)}
@@ -235,7 +275,9 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
               <Icon name="chevron" size={20} className="next-open-chevron" />
             </button>
           </p>
-          <p className="next-airline">{movement.airline.name}</p>
+          <p className="next-airline">
+            <OperatorName airline={movement.airline} className="next-airline-value" />
+          </p>
           <p className="next-line">
             <span className="next-reg app-numeric">
               {movement.airframe.registration ?? 'Reg unknown'}
@@ -243,7 +285,15 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
             <span className="next-dot" aria-hidden="true">
               ·
             </span>
-            <span className="next-route">
+            {/* No city named is a decision the app made, and the detail sheet gives the reason. */}
+            <span
+              className="next-route"
+              title={
+                ends
+                  ? undefined
+                  : 'No rotation on file matches this callsign, so we name no city — open the flight for why'
+              }
+            >
               {ends ? `${ends.from} → ${ends.to}` : routeLabel(movement.route, movement.kind)}
             </span>
           </p>
@@ -260,7 +310,9 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
       <div className="next-track">
         {down ? (
           // "3.2 nm to run" is not a true thing to say about an aeroplane that has landed.
-          <p className="next-track-void">On the ground at Heathrow — taxiing in</p>
+          <p className="next-track-void">
+            {GROUND_LINE[movement.phase] ?? 'On the ground at Heathrow'}
+          </p>
         ) : progress ? (
           <>
             <div

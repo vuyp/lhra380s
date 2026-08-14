@@ -17,7 +17,7 @@ import type { IconName } from '../../components/ui/Icon.tsx';
 import { Segmented } from '../../components/ui/Segmented.tsx';
 import { Skeleton } from '../../components/ui/Skeleton.tsx';
 import { formatClock, formatCountdown } from '../../lib/format.ts';
-import { MovementCard, flightTitle, placeLabel } from './MovementCard.tsx';
+import { MovementCard, flightTitle, formatAge, placeLabel } from './MovementCard.tsx';
 import { NextWhale } from './NextWhale.tsx';
 import './BoardTab.css';
 
@@ -69,6 +69,33 @@ function pickNextWhale(arrivals: Movement[]): Movement | null {
 
 /** How long a whale that has just touched down stays in the hero before it gives way. */
 const JUST_LANDED_MS = 2 * 60_000;
+
+/**
+ * How long after a server start the departures board is still explaining itself.
+ *
+ * An A380 is only called outbound if this app watched it leave, and a restart forgets everything
+ * that was already in the air — which is correct, and looks exactly like a broken board for the
+ * first hour and a half. 90 minutes is the same window the tracker itself keeps an outbound
+ * flight for, so it is the length of time the gap can still be showing.
+ */
+const YOUNG_SERVER_SECONDS = 90 * 60;
+
+const DEPARTURES_EMPTY =
+  'Nothing pushing back or rolling. Departures appear once an A380 starts moving on the ground at Heathrow.';
+
+/**
+ * The same empty board, with the reason it is empty when the reason is the tracker's own age.
+ */
+function departuresEmptyMessage(uptimeSeconds: number): string {
+  if (!Number.isFinite(uptimeSeconds) || uptimeSeconds < 0 || uptimeSeconds >= YOUNG_SERVER_SECONDS) {
+    return DEPARTURES_EMPTY;
+  }
+  return (
+    `Nothing pushing back or rolling. Whale Watch has been running ${formatAge(uptimeSeconds)} and ` +
+    'only counts a departure it watched happen, so anything that left before that is missing. ' +
+    'The board fills as the day goes on.'
+  );
+}
 
 /**
  * The whale that landed a moment ago.
@@ -265,7 +292,7 @@ export function BoardTab(): ReactElement {
           tone="departure"
           movements={snapshot.departures}
           now={now}
-          empty="Nothing pushing back or rolling. Departures appear once an A380 starts moving on the ground at Heathrow."
+          empty={departuresEmptyMessage(snapshot.health.uptimeSeconds)}
         />
       ) : null}
 

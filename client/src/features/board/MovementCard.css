@@ -68,8 +68,16 @@
 }
 
 .mv-airline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
   font-size: var(--text-sm);
   color: var(--text-secondary);
+}
+
+/* The name takes the ellipsis; the inference tag beside it is never the part that gets cut. */
+.mv-airline-name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -251,6 +259,14 @@
 .mv-vertical {
   font-size: var(--text-xs);
   color: var(--text-secondary);
+}
+
+/* Deliberately the same quiet weight as the vertical rate: a fact about the aircraft, not a fault. */
+.mv-undirected {
+  flex: 1 1 22ch;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 /* ---- Wider screens ------------------------------------------------------------ */

@@ -555,6 +555,10 @@
 .map-controls {
   top: var(--space-3);
   right: var(--space-3);
+  /* Above the top-left stack: the labels open leftwards and were being painted underneath a
+     wide status panel. The two blocks never overlap themselves — the stack is capped short of
+     the rail — so nothing else changes. */
+  z-index: 2;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
@@ -563,10 +567,12 @@
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
+  /* No `overflow: hidden` here — it would clip every button's label. The ends are rounded
+     individually instead, which is all the clipping was doing. */
 }
 
 .map-btn {
+  position: relative;
   display: grid;
   place-items: center;
   width: var(--tap-target);
@@ -577,8 +583,47 @@
     background-color var(--dur) var(--ease);
 }
 
+.map-controls > .map-btn:first-child {
+  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
+}
+
+.map-controls > .map-btn:last-child {
+  border-radius: 0 0 calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px);
+}
+
 .map-btn + .map-btn {
   border-top: 1px solid var(--line);
+}
+
+/*
+ * The label. Visible on hover and on keyboard focus, and — being real text inside the button —
+ * it is also the button's accessible name, so the two can never drift apart.
+ */
+.map-btn-label {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + var(--space-2));
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transform: translate(var(--space-1), -50%);
+  pointer-events: none;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.map-btn:hover .map-btn-label,
+.map-btn:focus-visible .map-btn-label {
+  opacity: 1;
+  transform: translate(0, -50%);
 }
 
 .map-btn:hover {
@@ -589,6 +634,13 @@
 .map-btn--on {
   color: var(--brand-cyan);
   background: color-mix(in srgb, var(--brand-cyan) 16%, transparent);
+}
+
+/* A pointer must not wipe out the "this is on" signal: `.map-btn:hover` carries more weight than
+   `.map-btn--on`, so hovering the lit control used to grey it out. */
+.map-btn--on:hover {
+  color: var(--brand-cyan);
+  background: color-mix(in srgb, var(--brand-cyan) 26%, transparent);
 }
 
 .map-btn:focus-visible {
@@ -602,6 +654,63 @@
   line-height: 1;
 }
 
+/* ---- Framing chip ---------------------------------------------------------------- */
+
+/*
+ * What the map is doing with itself, and the way out of it. It sits under the status pill rather
+ * than in the control rail because the state it reports is a sentence, not a glyph — and because
+ * the reader who most needs it is the one who has just panned the traffic off screen.
+ */
+.map-frame {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--map-glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow-md);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  transition:
+    color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.map-frame .ui-icon {
+  flex: none;
+}
+
+/* Following the traffic: the accent says "this is live", matching the arrival glow on the map. */
+.map-frame--auto {
+  border-color: var(--line-accent);
+  color: var(--brand-cyan);
+}
+
+.map-frame--manual,
+.map-frame--world {
+  color: var(--text);
+}
+
+.map-frame:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.map-frame--auto:hover {
+  color: var(--brand-cyan);
+}
+
+.map-frame:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 2px;
+}
+
 .map-legend {
   left: var(--space-3);
   bottom: calc(var(--space-3) + var(--map-credit-clear));
@@ -612,6 +721,18 @@
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   box-shadow: var(--shadow-md);
+}
+
+/*
+ * Stood down while a spot card is open on a phone: the two share a corner of a map that is only
+ * 440 px tall, and the card is what was asked for. Hidden rather than unmounted so nothing about
+ * the layout — or the reader's open/closed choice — is disturbed while it waits.
+ */
+.map-legend--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--dur) var(--ease);
 }
 
 .map-legend-summary {
@@ -789,6 +910,79 @@
   line-height: 1.5;
 }
 
+/* ---- Nothing to draw ------------------------------------------------------------- */
+
+/*
+ * "Nothing is here" is an answer, not a failure, and it must not borrow the language of one: no
+ * alert colour, no solid plate, no icon that means "problem". Frosted rather than opaque so the
+ * runways stay readable through it — they are the live thing on the screen while there is no
+ * traffic to draw.
+ */
+.map-empty {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--map-glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow-md);
+  /* The map has to stay draggable underneath; only the button takes the pointer. */
+  pointer-events: none;
+}
+
+.map-empty-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.map-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--brand-cyan) 14%, transparent);
+  color: var(--brand-cyan);
+}
+
+.map-empty-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.map-empty-text {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.map-empty-action {
+  pointer-events: auto;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line-accent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--brand-cyan) 14%, transparent);
+  color: var(--brand-cyan);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  transition: background-color var(--dur) var(--ease);
+}
+
+.map-empty-action:hover {
+  background: color-mix(in srgb, var(--brand-cyan) 26%, transparent);
+}
+
+.map-empty-action:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 2px;
+}
+
 /* ---- Responsive ------------------------------------------------------------------ */
 
 @media (min-width: 720px) {
@@ -824,6 +1018,60 @@
   }
 }
 
+/*
+ * A phone on its side. The map area is barely 260 px tall there and a six-button column needs
+ * 266, so the world-view control — the only way back from world view — was falling off the
+ * bottom. Two rows of three keep every target at its full 44 px and clear the bottom bar.
+ */
+@media (max-height: 450px) {
+  .map-controls {
+    /* Grid, not wrapped flex: the row has to hold exactly three 44 px targets, and a flex line
+       width has to account for the borders on every box to do that reliably. */
+    display: grid;
+    grid-template-columns: repeat(3, var(--tap-target));
+    width: max-content;
+  }
+
+  .map-controls > .map-btn:first-child {
+    border-radius: calc(var(--radius-md) - 1px) 0 0 0;
+  }
+
+  .map-controls > .map-btn:nth-child(3) {
+    border-radius: 0 calc(var(--radius-md) - 1px) 0 0;
+  }
+
+  .map-controls > .map-btn:nth-child(4) {
+    border-radius: 0 0 0 calc(var(--radius-md) - 1px);
+  }
+
+  .map-controls > .map-btn:last-child {
+    border-radius: 0 0 calc(var(--radius-md) - 1px) 0;
+  }
+
+  .map-btn + .map-btn {
+    border-top: 0;
+  }
+
+  .map-btn:nth-child(n + 4) {
+    border-top: 1px solid var(--line);
+  }
+
+  .map-btn:nth-child(3n + 2),
+  .map-btn:nth-child(3n + 3) {
+    border-left: 1px solid var(--line);
+  }
+
+  /*
+   * A label revealed beside the right-hand column would land on top of the left-hand one, so it
+   * stays invisible here. Invisible, not removed: `display: none` would take it out of the
+   * accessibility tree and with it the button's only name.
+   */
+  .map-btn:hover .map-btn-label,
+  .map-btn:focus-visible .map-btn-label {
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .map-dot--live,
   .map-overlay-pulse,
@@ -833,6 +1081,8 @@
 
   .map-plane,
   .map-pin-dot,
+  .map-btn-label,
+  .map-frame,
   .map-legend-summary::after,
   .map-plane-halo::after {
     transition: none;

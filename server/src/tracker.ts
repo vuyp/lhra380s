@@ -69,7 +69,7 @@ import {
   type LatLon,
 } from './geo.ts';
 import { createLogger } from './log.ts';
-import { AIRPORT, getAirframe, getAirline, getSpots, lookupRoute } from './reference.ts';
+import { AIRPORT, UNKNOWN_AIRLINE, getAirframe, getAirline, getSpots, lookupRoute } from './reference.ts';
 import { deriveRunwayConfig, predictArrivalRunway, predictDepartureRunway } from './runway.ts';
 import { evaluateSpots } from './spots.ts';
 import { MovementStore } from './store.ts';
@@ -214,6 +214,12 @@ const CLIMB_OUT_NM = 30;
 const STAND_AFTER_MS = 3 * 60_000;
 /** Ground speed below this counts as stationary. */
 const STATIONARY_KTS = 3;
+/**
+ * Above this an aeroplane on the ground is rolling, not taxiing. An A380 taxies at 10–25 kt and
+ * leaves a runway at little more, so anything faster is still the landing roll — and calling a
+ * 90 kt roll-out "taxiing in" would be its own small lie.
+ */
+const TAXI_MAX_KTS = 40;
 /** Ground speed above this on a centreline is a take-off roll. */
 const TAKEOFF_ROLL_KTS = 60;
 /** No A380 lands and departs again inside this — it is a roll-out, not a take-off. */
@@ -332,6 +338,16 @@ const ROTATION_HALF_WIDTH_NM = 0.25;
 const ROTATION_BEHIND_NM = 0.25;
 const ROTATION_AHEAD_NM = 2;
 
+/**
+ * The line-up box: how far back from a threshold, and how far down the runway, an aeroplane may be
+ * and still be "lined up to go". Deliberately short — it is the first few hundred metres of the
+ * take-off run, which is somewhere a landing aeroplane is never slow.
+ */
+const LINE_UP_BEHIND_NM = 0.25;
+const LINE_UP_AHEAD_NM = 0.6;
+/** …and how closely it must be pointing down the runway. Tighter than the approach gate. */
+const LINE_UP_ALIGN_DEG = 25;
+
 function insideAirport(position: LatLon | null): boolean {
   if (position === null) return false;
   if (AIRPORT.boundary.length >= 3) return pointInPolygon(position, AIRPORT.boundary);
@@ -373,6 +389,39 @@ function runwayUnderAircraft(position: LatLon | null, track: number | null): Run
   }
   if (best === null) return UNKNOWN_RUNWAY;
   return { runway: best.designator, source: 'observed', confidence: 0.9 };
+}
+
+/**
+ * Is this aeroplane sitting on a runway, at the beginning of it, pointing down it, at taxi speed?
+ *
+ * This is the *only* piece of ground geometry at Heathrow that says "departure" on its own, and it
+ * is worth being explicit about why the obvious alternatives do not.
+ *
+ * Proximity to a runway holding point does not work here. Under westerlies a 27R arrival rolls out
+ * to the *west* end and vacates a few hundred metres from the 09L threshold — it is standing where
+ * the departure queue stands when the airport is on easterlies. The same asphalt serves both.
+ *
+ * Direction of travel along the airfield does not work either. A whale that has just landed on 27R
+ * taxies east back to the central terminal area; a whale about to depart 27L taxies east to the
+ * hold. Same taxiways, same heading, opposite intentions.
+ *
+ * What has no second reading is an aeroplane in the first half mile of a runway, aligned with that
+ * runway's take-off direction, moving at taxi speed. Nothing arrives into that position: a landing
+ * is doing 120 kt there and pointing the other way, and a crossing is perpendicular. So this alone
+ * may assert `taxi_out` without a stand dwell behind it — and when it does not fire, the honest
+ * answer is that we do not know which way the aeroplane is going.
+ */
+function linedUpForDeparture(position: LatLon | null, track: number | null, groundSpeedKts: number): boolean {
+  if (position === null || track === null) return false;
+  if (groundSpeedKts > TAXI_MAX_KTS) return false;
+  for (const line of RUNWAY_LINES) {
+    if (Math.abs(crossTrackNm(position, line.start, line.finish)) > CENTRELINE_HALF_WIDTH_NM) continue;
+    const along = alongTrackNm(position, line.start, line.finish);
+    if (along < -LINE_UP_BEHIND_NM || along > LINE_UP_AHEAD_NM) continue;
+    if (angularDelta(track, line.end.bearing) > LINE_UP_ALIGN_DEG) continue;
+    return true;
+  }
+  return false;
 }
 
 /** True when the track lines up with any Heathrow runway direction. */
@@ -954,6 +1003,7 @@ class TrackerImpl implements Tracker, ReplayTracker {
 
     const route = flight.scheduledRoute;
     const city = kind === 'arrival' ? (route?.origin?.city ?? null) : (route?.destination?.city ?? null);
+    const operator = loggedOperator(flight.airline);
 
     const entry: LoggedMovement = {
       id: flight.hex,
@@ -962,8 +1012,15 @@ class TrackerImpl implements Tracker, ReplayTracker {
       callsign: flight.callsign,
       flightNumber: flight.flightNumber,
       registration: flight.registration,
-      operator: flight.airline.name,
-      operatorColor: flight.airline.color,
+      // Same rule as the runway below, applied to the operator: `LoggedMovement` carries no
+      // provenance, so only an identification the app actually read — the transmitted callsign,
+      // or this exact registration in the curated fleet — may be written here as fact. A
+      // registration-prefix inference is a claim about every A380 sharing a country prefix, and
+      // the frame that is *not* on that list is the one worth coming out for; filing it under
+      // British Airways for ever, in a record with nothing to qualify it, is how a guess becomes
+      // history. The row still carries the registration, which is the observation.
+      operator: operator.name,
+      operatorColor: operator.color,
       // The log is a record of what was seen. A runway the geometry did not actually show us —
       // the active configuration's guess, say — is a prediction, and LoggedMovement carries no
       // provenance for the UI to qualify it with, so it is left out rather than stated as fact.
@@ -989,9 +1046,9 @@ class TrackerImpl implements Tracker, ReplayTracker {
   /**
    * Did this airframe land at Heathrow recently, with nothing logged since?
    *
-   * Consulted only on first contact with an aeroplane already on the ground, where the phase
-   * machine itself knows nothing. The log holds the touchdown the poller watched happen, and a
-   * whale that landed twenty minutes ago and has not departed is on its way to a stand.
+   * The evidence that survives a restart. The session's own phase history is gone after one, but
+   * the log still holds the touchdown the poller watched happen, and a whale that landed twenty
+   * minutes ago and has not departed is on its way to a stand — not away from one.
    */
   private arrivedRecently(hex: string, now: number): boolean {
     const history = this.store.forAirframe(hex);
@@ -1018,23 +1075,31 @@ class TrackerImpl implements Tracker, ReplayTracker {
         return 'departing';
       }
 
+      // A whale holding on the runway for its take-off clearance is not "at stand", however long it
+      // sits there, and must never be credited with the dwell that licenses `taxi_out`.
+      const linedUp = linedUpForDeparture(where, ac.track, groundSpeed);
+
       const stationaryFor = flight.stationarySince === null ? 0 : now - flight.stationarySince;
-      if (groundSpeed < STATIONARY_KTS && stationaryFor > STAND_AFTER_MS) {
+      if (groundSpeed < STATIONARY_KTS && stationaryFor > STAND_AFTER_MS && !linedUp) {
         // SPEC §5: the dwell is what makes it a stand, and only the observed dwell may set the
         // flag that later licenses `taxi_out`. Ten seconds of stillness is a pause at a hold.
         flight.hasBeenAtStand = true;
         return 'stand';
       }
-      if (previous === 'stand' && groundSpeed < STATIONARY_KTS) return 'stand';
+      if (previous === 'stand' && groundSpeed < STATIONARY_KTS && !linedUp) return 'stand';
 
-      if (flight.hasBeenAtStand) return 'taxi_out';
-      if (previous === 'inbound' || previous === 'approach' || previous === 'landed') return 'landed';
-      if (previous === 'departing' || previous === 'taxi_out') return 'taxi_out';
-      // First contact on the ground at Heathrow: the phase machine has no history, but the
-      // movement log may — an airframe that landed here a few minutes ago and has not departed
-      // since is taxiing *in*, whatever it looks like from one frame.
-      if (this.arrivedRecently(flight.hex, now)) return 'landed';
-      return groundSpeed < STATIONARY_KTS ? 'stand' : 'taxi_out';
+      return classifyGroundMovement({
+        previousPhase: previous,
+        hasBeenAtStand: flight.hasBeenAtStand,
+        // Touched down here in this session and has not left since — the strongest thing the state
+        // machine can know about a whale on the tarmac, because it watched it happen.
+        landedThisSession: flight.loggedArrivalAt !== null && !flight.departedThisSession,
+        // …and failing that, the persisted log, which survives the restart the session did not.
+        arrivedRecently: this.arrivedRecently(flight.hex, now),
+        groundSpeedKts: ac.groundSpeed,
+        position: where,
+        track: ac.track,
+      });
     }
 
     const distance = flight.distance;
@@ -1385,6 +1450,10 @@ class TrackerImpl implements Tracker, ReplayTracker {
     }
     // Once the wheels have touched or left the ground, the runway is observed, not predicted.
     if (flight.eventRunway !== null) return flight.eventRunway;
+    // Only an aeroplane we can say is heading *out* gets the departure runway. A `taxi_in` is
+    // going to a stand, and a `taxi_unknown` is going somewhere we have not established — pinning
+    // the configuration's departure runway to either would restate the guess this app just
+    // stopped making.
     if (kind === 'departure' || flight.phase === 'taxi_out') return predictDepartureRunway(this.runwayConfig);
     return UNKNOWN_RUNWAY;
   }
@@ -1569,6 +1638,92 @@ function isArrivalPhase(phase: FlightPhase): boolean {
   return phase === 'inbound' || phase === 'approach';
 }
 
+/* ------------------------------------------------------------------ *
+ * Which way is that whale taxiing?
+ * ------------------------------------------------------------------ */
+
+/** What an A380 on the tarmac at Heathrow can be doing. */
+export type GroundPhase = Extract<FlightPhase, 'landed' | 'taxi_in' | 'stand' | 'taxi_out' | 'taxi_unknown'>;
+
+/**
+ * Everything the taxi-direction decision is allowed to look at. Exported so every combination can
+ * be tested directly rather than inferred from a whole replay.
+ */
+export interface TaxiEvidence {
+  /** The phase this airframe held on the previous poll. */
+  previousPhase: FlightPhase;
+  /** A three-minute stand dwell has been observed in this session, with no departure since. */
+  hasBeenAtStand: boolean;
+  /** This session watched this airframe touch down here, and it has not left since. */
+  landedThisSession: boolean;
+  /** The persisted movement log holds a recent touchdown for it, with nothing logged after. */
+  arrivedRecently: boolean;
+  /** Ground speed, knots. Null when the frame carried none. */
+  groundSpeedKts: number | null;
+  /** Where it is. Null when no position has ever been received. */
+  position: LatLon | null;
+  /** Track over ground, degrees true. */
+  track: number | null;
+}
+
+/**
+ * Which way is this aeroplane going, and are we entitled to say?
+ *
+ * The defect this exists to kill: an A380 that has just landed, met for the first time by a server
+ * that was not running when it did, used to fall through to `taxi_out` and be announced as
+ * "Taxiing out" with a departure-coloured chip. It was arriving. Nothing in the frame said
+ * otherwise; nothing in the frame said *anything*, which is the point.
+ *
+ * So the decision is made from evidence, in descending order of how directly it was observed, and
+ * runs out honestly:
+ *
+ *  1. a stand dwell this session — the aeroplane sat still for three minutes and is now moving, so
+ *     it is going flying (SPEC §5). This outranks an earlier arrival: land, taxi in, sit, taxi out
+ *     is the whole shape of a turnaround;
+ *  2. lined up on a runway pointing down it — a fact about this frame, so it outranks the log,
+ *     which is a fact about something that happened up to three quarters of an hour ago;
+ *  3. a touchdown this session, or one in the persisted log with nothing after it — it is taxiing
+ *     in, and the roll-out that precedes the taxi is `landed` rather than either;
+ *  4. otherwise `taxi_unknown`. Not a fallback and not a failure: "moving on the ground at
+ *     Heathrow, I do not know which way" is the true and complete answer, and on a cold start it
+ *     is the *usual* one. Guessing here buys nothing and costs the only thing this app sells.
+ */
+export function classifyGroundMovement(evidence: TaxiEvidence): GroundPhase {
+  const previous = evidence.previousPhase;
+  const speed = evidence.groundSpeedKts ?? 0;
+  const moving = speed >= STATIONARY_KTS;
+
+  // (1) An observed dwell, or a roll we already called a departure, points this aeroplane out.
+  if (evidence.hasBeenAtStand) return 'taxi_out';
+  if (previous === 'departing' || previous === 'taxi_out') return 'taxi_out';
+
+  // (2) Sitting on the runway pointing down it, at taxi speed. Nothing arrives into that.
+  if (linedUpForDeparture(evidence.position, evidence.track, speed)) return 'taxi_out';
+
+  // (3) A touchdown we can point at. `previousPhase` covers the flight we tracked all the way
+  // down; the other two cover the one we met on the ground afterwards.
+  const arrived =
+    evidence.landedThisSession ||
+    evidence.arrivedRecently ||
+    previous === 'inbound' ||
+    previous === 'approach' ||
+    previous === 'landed' ||
+    previous === 'taxi_in';
+
+  if (arrived) {
+    // Still rolling out: too fast to be taxiing anywhere. That is the landing, not the taxi.
+    if (speed > TAXI_MAX_KTS) return 'landed';
+    if (moving) return 'taxi_in';
+    // Stopped. A pause on the taxiway does not end the taxi in; a stop straight off the runway is
+    // still the landing until the three-minute dwell makes it a stand.
+    return previous === 'taxi_in' ? 'taxi_in' : 'landed';
+  }
+
+  // (4) Stationary and unremarkable is a stand; moving and unremarkable is honestly unknown.
+  if (!moving) return 'stand';
+  return 'taxi_unknown';
+}
+
 /**
  * How well the evidence supports "this aircraft is coming to Heathrow".
  *
@@ -1750,9 +1905,13 @@ function kindForPhase(phase: FlightPhase): MovementKind | null {
     case 'inbound':
     case 'approach':
       return 'arrival';
+    // Everything on the tarmac is a ground movement, including the taxi whose direction we cannot
+    // name: putting an unknown taxi on the departures board would be the guess all over again.
     case 'landed':
+    case 'taxi_in':
     case 'stand':
     case 'taxi_out':
+    case 'taxi_unknown':
       return 'ground';
     case 'departing':
     case 'climb_out':
@@ -1776,12 +1935,31 @@ function rawEtaMinutes(distance: number | null, groundSpeed: number | null): num
   return minutes;
 }
 
+/**
+ * Which identifications may be stated flatly, with no room left to qualify them.
+ *
+ * `callsign` and `fleet` are things the app read: an airline code the aeroplane transmitted, or
+ * this exact registration in the curated fleet. `registration_prefix` is an inference, and
+ * `LoggedMovement` and `GlobalAircraft` both carry the operator as a bare string with nowhere to
+ * say so. In those two records the inference degrades to the neutral "Unknown" it would have been
+ * without the guess — which, in the world fleet, sorts the unlisted frame into its own group
+ * instead of hiding it inside an airline's.
+ */
+function loggedOperator(airline: Airline): { name: string; color: string; stated: boolean } {
+  if (airline.source === 'callsign' || airline.source === 'fleet') {
+    return { name: airline.name, color: airline.color, stated: true };
+  }
+  return { name: UNKNOWN_AIRLINE.name, color: UNKNOWN_AIRLINE.color, stated: false };
+}
+
 function toGlobal(flight: TrackedFlight): GlobalAircraft {
+  const airline = loggedOperator(flight.airline);
   return {
     hex: flight.hex,
     callsign: flight.callsign,
     registration: flight.registration,
-    operator: flight.airframe.operator ?? (flight.airline.name === 'Unknown' ? null : flight.airline.name),
+    // The fleet reference is a published fact about this airframe and outranks everything.
+    operator: flight.airframe.operator ?? (airline.stated ? airline.name : null),
     lat: flight.position?.lat ?? null,
     lon: flight.position?.lon ?? null,
     altitude: flight.last.altitude,
@@ -1814,7 +1992,8 @@ function byDepartureImminence(a: Movement, b: Movement): number {
   return distA - distB;
 }
 
-const GROUND_RANK: Record<string, number> = { taxi_out: 0, landed: 1, stand: 2 };
+/** Ground order: what is about to leave, then what has just arrived, then what is parked. */
+const GROUND_RANK: Record<string, number> = { taxi_out: 0, landed: 1, taxi_in: 2, taxi_unknown: 3, stand: 4 };
 
 function byGroundOrder(a: Movement, b: Movement): number {
   const rankA = GROUND_RANK[a.phase] ?? 3;

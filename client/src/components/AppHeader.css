@@ -175,9 +175,8 @@
 
 .hdr-ops {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1) var(--space-4);
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -188,6 +187,13 @@
   );
 }
 
+.hdr-ops-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+}
+
 .hdr-ops-block {
   display: flex;
   flex: 1 1 auto;
@@ -195,6 +201,43 @@
   align-items: flex-start;
   gap: var(--space-3);
   min-width: 0;
+}
+
+/*
+ * The whole configuration is the control: a spotter reads it, everyone else opens it. The
+ * padding and the matching negative margin give the hover state something to fill without
+ * moving the text one pixel from where it sits when nothing is being pointed at.
+ */
+.hdr-ops-toggle {
+  text-align: start;
+  padding-inline: var(--space-2);
+  margin-inline: calc(var(--space-2) * -1);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur) var(--ease);
+}
+
+.hdr-ops-toggle:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.hdr-ops-chevron {
+  flex: none;
+  /* Sits at the end of the row and on the first line of it, beside "Westerly ops". */
+  margin-inline-start: auto;
+  height: 1.5em;
+  color: var(--text-muted);
+  transform: rotate(90deg);
+  transition:
+    transform var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.hdr-ops-toggle:hover .hdr-ops-chevron {
+  color: var(--text);
+}
+
+.hdr-ops-chevron--open {
+  transform: rotate(-90deg);
 }
 
 .hdr-ops-icon {
@@ -278,6 +321,55 @@
   font-size: var(--text-xs);
   font-weight: var(--weight-normal);
   color: var(--text-secondary);
+}
+
+/* ---- What the configuration means ------------------------------------------ */
+
+.hdr-ops-explain {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  max-width: 78ch;
+  animation: hdr-explain-in var(--dur) var(--ease);
+}
+
+.hdr-explain-list {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.hdr-explain-item {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.hdr-explain-lead {
+  color: var(--text);
+}
+
+.hdr-explain-runway {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.hdr-explain-note {
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+@keyframes hdr-explain-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .hdr-wind {
@@ -470,16 +562,30 @@
   }
 }
 
+/*
+ * Touch widths only: on a phone or tablet the configuration is a control, and a control has to
+ * be 44px tall. On a desktop it is one 25px line beside the wind, and growing the header there
+ * would cost every screen below it the space for nothing.
+ */
+@media (max-width: 719px) {
+  .hdr-ops-toggle {
+    min-height: var(--tap-target);
+  }
+}
+
 @media (min-width: 720px) {
   .hdr-inner {
     padding-inline: var(--space-5);
   }
 
   .hdr-ops {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .hdr-ops-row {
     flex-wrap: nowrap;
     justify-content: space-between;
     align-items: center;
-    padding: var(--space-3) var(--space-4);
   }
 
   .hdr-ops-block {

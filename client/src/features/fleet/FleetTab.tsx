@@ -10,13 +10,14 @@
  * we hold for that hex. All of it comes from the snapshot — nothing is inferred or invented.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement } from 'react';
 import type { Snapshot } from '../../../../shared/types.ts';
 import { useSnapshot } from '../../api/useSnapshot.ts';
 import { Segmented } from '../../components/ui/Segmented.tsx';
 import { Skeleton } from '../../components/ui/Skeleton.tsx';
 import { Stat } from '../../components/ui/Stat.tsx';
+import { useRouteDetail } from '../../state/route.ts';
 import { MovementLog } from './MovementLog.tsx';
 import { WorldFleet } from './WorldFleet.tsx';
 import './FleetTab.css';
@@ -27,6 +28,10 @@ const VIEWS: Array<{ value: FleetView; label: string }> = [
   { value: 'log', label: "Today's log" },
   { value: 'world', label: 'World fleet' },
 ];
+
+function isFleetView(value: string | null): value is FleetView {
+  return value === 'log' || value === 'world';
+}
 
 const counter = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
 
@@ -85,7 +90,27 @@ function FleetSkeleton(): ReactElement {
 
 export function FleetTab(): ReactElement {
   const { snapshot } = useSnapshot();
-  const [view, setView] = useState<FleetView>('log');
+  // `#fleet/world` opens the world fleet directly, so the airborne count elsewhere in the app can
+  // be a link rather than a number the reader has to go hunting for.
+  const routeView = useRouteDetail('fleet');
+  const [chosen, setChosen] = useState<FleetView | null>(null);
+
+  useEffect(() => {
+    if (isFleetView(routeView)) setChosen(routeView);
+  }, [routeView]);
+
+  /*
+   * Which view opens by default is decided once, on the first snapshot, and then left alone.
+   * The movement log is the better landing place when there is something in it, and it is empty
+   * for most of the early morning and after every restart — sending a first-time reader to a
+   * blank list hides the thing this tab is best at. Freezing the choice matters as much as
+   * making it: recomputing would swap the view under someone the moment the first whale landed.
+   */
+  const defaultView = useRef<FleetView | null>(null);
+  if (snapshot && defaultView.current === null) {
+    defaultView.current = snapshot.log.length === 0 ? 'world' : 'log';
+  }
+  const view = chosen ?? defaultView.current ?? 'log';
 
   const lhrHexes = useMemo(
     () => (snapshot ? heathrowHexes(snapshot) : new Set<string>()),
@@ -142,7 +167,7 @@ export function FleetTab(): ReactElement {
         <Segmented
           options={VIEWS}
           value={view}
-          onChange={setView}
+          onChange={(next) => setChosen(next)}
           ariaLabel="Choose a fleet view"
         />
       </div>

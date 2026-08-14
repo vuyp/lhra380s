@@ -15,6 +15,8 @@ import { createPortal } from 'react-dom';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactElement } from 'react';
 import type {
   AircraftDetail,
+  Airline,
+  FlightPhase,
   GlobalAircraft,
   LoggedMovement,
   Movement,
@@ -51,6 +53,15 @@ import './AircraftSheet.css';
 
 const DASH = '—';
 const UNKNOWN = 'Not on file';
+
+/** Every phase on the tarmac: none of them counts down to anything. */
+const GROUND_PHASES: ReadonlySet<FlightPhase> = new Set<FlightPhase>([
+  'landed',
+  'taxi_in',
+  'stand',
+  'taxi_out',
+  'taxi_unknown',
+]);
 
 /** Past this distance dragged, or this downward speed, the sheet goes. */
 const DISMISS_PX = 110;
@@ -126,12 +137,18 @@ function RouteEnd(p: { place: Place | null; heathrow: boolean; role: string }): 
 function RouteBlock(p: { movement: Movement }): ReactElement {
   const { route, kind } = p.movement;
   const block = blockLabel(route.blockMinutes);
+  /*
+   * The unknown case is the common one and the one that looks like a fault on the board, so this
+   * is where it gets explained rather than merely restated.
+   */
   const sourceNote =
     route.source === 'schedule'
       ? 'Matched to the curated Heathrow A380 rotation table'
       : route.source === 'inferred'
         ? 'Direction inferred from the track — the far end is not confirmed'
-        : 'No schedule match: we will not name a city we have not verified';
+        : 'No rotation on file matches this callsign, so no city is named. Most A380s now ' +
+          'transmit a suffixed operational callsign — UAE1H rather than UAE1 — which the curated ' +
+          'table cannot match, and a plausible city would be worse than an honest gap.';
 
   return (
     <section className="det-section">
@@ -162,16 +179,17 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
   const { settings } = useSettings();
   const { lastUpdate } = useSnapshot();
   const { telemetry } = movement;
-  const runway = runwayHint(movement.runway);
   const age = positionAgeSeconds(movement, lastUpdate, now);
   const stale = movement.coasting || age >= STALE_AFTER_SECONDS;
   const arriving = movement.kind === 'arrival';
 
   /*
    * A frame that is already down has no countdown, and printing "Off blocks in —" over the top
-   * of the panel says nothing. Report the event we actually watched happen instead.
+   * of the panel says nothing — worse, it says "departure" about a whale that has just landed.
+   * Every phase on the tarmac reports the event we actually watched happen instead.
    */
-  const down = movement.phase === 'landed' || movement.phase === 'stand';
+  const down = GROUND_PHASES.has(movement.phase);
+  const runway = runwayHint(movement.runway, down || telemetry.onGround ? 'ground' : 'air');
   const downAt = movement.actualAt ?? movement.lastSeen;
   const headline = down
     ? {
@@ -197,6 +215,16 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
           </Chip>
         ) : null}
       </div>
+
+      {/* Three taxi phases, three amounts of knowledge. This is the one with the least. */}
+      {movement.phase === 'taxi_unknown' ? (
+        <p className="det-note">
+          Moving on the ground at Heathrow, direction not established. Calling a taxi inbound or
+          outbound needs something watched — a touchdown, a stand dwell, or a line-up on a runway —
+          and none of those is on record for this aircraft. Until one is, it stays on the ground
+          board rather than departures.
+        </p>
+      ) : null}
 
       <div className="det-facts">
         <Stat
@@ -297,6 +325,55 @@ function GlobalBlock(p: { aircraft: GlobalAircraft }): ReactElement {
       </div>
     </section>
   );
+}
+
+/** "G-" from "G-XLEF" — the part a prefix inference is actually built on. */
+function registrationPrefix(registration: string | null): string | null {
+  if (!registration) return null;
+  const index = registration.indexOf('-');
+  return index > 0 ? registration.slice(0, index + 1) : null;
+}
+
+/**
+ * The caveat on an operator we worked out rather than watched.
+ *
+ * A name at the top of this panel reads as fact, and for `callsign` and `fleet` it is one. A
+ * `registration_prefix` match is not: it says only that every A380 on file with this prefix
+ * belongs to that airline, and the A380 that is *not* on the file is exactly the one worth
+ * standing at the fence for. The board card stays clean; the sheet is where this belongs.
+ */
+function OperatorNote(p: { airline: Airline; registration: string | null }): ReactElement | null {
+  const { airline, registration } = p;
+
+  if (airline.source === 'registration_prefix') {
+    const prefix = registrationPrefix(registration);
+    return (
+      <section className="det-section">
+        <p className="det-note det-note--caution">
+          <strong>{airline.name} is inferred, not observed.</strong> Nothing this aircraft
+          transmitted names an airline
+          {prefix
+            ? `, and ${airline.name} is the only A380 operator on file with a ${prefix} registration.`
+            : ', and it is the only A380 operator on file with this registration prefix.'}{' '}
+          A visiting or leased frame would be named wrongly here.
+        </p>
+      </section>
+    );
+  }
+
+  if (airline.source === 'unknown') {
+    return (
+      <section className="det-section">
+        <p className="det-note det-note--caution">
+          <strong>The operator is not known.</strong> The callsign carries no airline code we hold
+          and the registration is not in the fleet reference, so nothing here names an airline. We
+          would rather leave it blank than pick the likeliest one.
+        </p>
+      </section>
+    );
+  }
+
+  return null;
 }
 
 function AirframeBlock(p: { airframe: AircraftDetail['airframe'] }): ReactElement {
@@ -454,11 +531,31 @@ function DetailPanel(p: { hex: string; onClose: () => void; onShowMap: () => voi
   const movement = live ?? detail?.movement ?? null;
   const airframe = detail?.airframe ?? movement?.airframe ?? null;
   const registration = movement?.airframe.registration ?? airframe?.registration ?? null;
+  // "Unknown" is the airline's own name for nothing-identified it, and it is not an operator.
+  // Where the fleet reference does know the frame, that is the better answer.
+  const airline = movement?.airline ?? null;
   const operator =
-    movement?.airline.name ?? airframe?.operator ?? detail?.global?.operator ?? null;
+    (airline !== null && airline.source !== 'unknown' ? airline.name : null) ??
+    airframe?.operator ??
+    detail?.global?.operator ??
+    null;
+  const operatorInferred = airline?.source === 'registration_prefix';
   const title = movement
     ? flightTitle(movement)
     : (detail?.global?.callsign ?? registration ?? hex.toUpperCase());
+  // The title already falls back to the registration, so only print it again when it adds
+  // something. "G-XLEJ" over "G-XLEJ 406D1A" is the same fact twice in two sizes.
+  const showRegistrationLine = registration !== null && registration !== title;
+
+  /**
+   * Whether there is anywhere on the map to send the reader. An airframe with no position is one
+   * the map cannot draw, and this panel has just said so — offering to show it there anyway is a
+   * button that does nothing, which is a small promise broken.
+   */
+  const plottable =
+    (movement?.telemetry.lat ?? null) !== null && (movement?.telemetry.lon ?? null) !== null
+      ? true
+      : (detail?.global?.lat ?? null) !== null && (detail?.global?.lon ?? null) !== null;
 
   const accent: CSSProperties | undefined = movement
     ? ({ '--det-accent': movement.airline.color } as CSSProperties)
@@ -604,16 +701,27 @@ function DetailPanel(p: { hex: string; onClose: () => void; onShowMap: () => voi
 
         <header className="det-head" {...dragProps}>
           <div className="det-head-main">
-            <p className="det-head-operator">{operator ?? 'Operator unknown'}</p>
+            <p className="det-head-operator">
+              {operator ?? 'Operator unknown'}
+              {operatorInferred ? (
+                // The same tag, in the same words, as the board card and the hero.
+                <span
+                  className="app-inferred-tag det-head-operator-tag"
+                  title="Worked out from the registration prefix, not from anything this aircraft transmitted"
+                >
+                  inferred
+                </span>
+              ) : null}
+            </p>
             <h2 className="det-head-title app-numeric" id={titleId}>
               {title}
             </h2>
             <p className="det-head-reg">
-              {registration ? (
+              {showRegistrationLine ? (
                 <span className="det-head-reg-value app-numeric">{registration}</span>
-              ) : (
+              ) : registration === null ? (
                 <span className="det-head-reg-none">Registration unknown</span>
-              )}
+              ) : null}
               <span className="det-head-hex app-numeric">{hex.toUpperCase()}</span>
             </p>
           </div>
@@ -635,6 +743,13 @@ function DetailPanel(p: { hex: string; onClose: () => void; onShowMap: () => voi
 
           {movement ? <LiveBlock movement={movement} now={now} /> : null}
           {!movement && detail?.global ? <GlobalBlock aircraft={detail.global} /> : null}
+          {/*
+            The "nothing named it" note only makes sense while nothing has: the fleet reference
+            can still know an airframe whose callsign told us nothing, and the header shows that.
+          */}
+          {airline && (airline.source !== 'unknown' || operator === null) ? (
+            <OperatorNote airline={airline} registration={registration} />
+          ) : null}
           {movement ? <RouteBlock movement={movement} /> : null}
           {airframe ? <AirframeBlock airframe={airframe} /> : null}
           {detail ? <HistoryBlock history={detail.history} now={now} /> : null}
@@ -678,12 +793,14 @@ function DetailPanel(p: { hex: string; onClose: () => void; onShowMap: () => voi
           </p>
         </div>
 
-        <footer className="det-actions">
-          <button type="button" className="det-action" onClick={onShowMap}>
-            <Icon name="map" size={18} />
-            Show on map
-          </button>
-        </footer>
+        {plottable ? (
+          <footer className="det-actions">
+            <button type="button" className="det-action" onClick={onShowMap}>
+              <Icon name="map" size={18} />
+              Show on map
+            </button>
+          </footer>
+        ) : null}
       </div>
     </div>,
     document.body,
