@@ -1,0 +1,76 @@
+/*
+ * FleetTab shell: the stats row, the view switch, and the vertical rhythm the two views sit in.
+ *
+ * The stats row is a fixed 2x2 on a phone and a single row of four from tablet up. Each cell
+ * reserves its height so a count going from 9 to 10 — or from a dash to a number on first
+ * load — moves nothing below it.
+ */
+
+.fleet {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* ---- Stats ------------------------------------------------------------------------ */
+
+.fleet-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  /* The 1px gap plus this fill draws the hairline grid between cells without extra elements. */
+  background: var(--line);
+  overflow: hidden;
+}
+
+.fleet-stat {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  /* Two label lines + value + sub, reserved up front so nothing reflows on refresh. */
+  min-height: 5.25rem;
+  padding: var(--space-3);
+  background: var(--surface-1);
+}
+
+/* ---- Switch ------------------------------------------------------------------------- */
+
+.fleet-switch {
+  display: flex;
+  justify-content: stretch;
+}
+
+.fleet-switch > * {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Larger screens ------------------------------------------------------------------- */
+
+@media (min-width: 560px) {
+  .fleet-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .fleet-stat {
+    min-height: 4.75rem;
+    padding: var(--space-4) var(--space-3);
+  }
+}
+
+@media (min-width: 720px) {
+  .fleet-switch {
+    justify-content: flex-start;
+  }
+
+  .fleet-switch > * {
+    flex: 0 1 auto;
+  }
+}
+
+@media (min-width: 900px) {
+  .fleet {
+    gap: var(--space-6);
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "EGLL": { "iata": "LHR", "city": "London", "country": "United Kingdom", "lat": 51.4706, "lon": -0.4619 },
+  "OMDB": { "iata": "DXB", "city": "Dubai", "country": "United Arab Emirates", "lat": 25.2528, "lon": 55.3644 },
+  "OMAA": { "iata": "AUH", "city": "Abu Dhabi", "country": "United Arab Emirates", "lat": 24.4330, "lon": 54.6511 },
+  "OTHH": { "iata": "DOH", "city": "Doha", "country": "Qatar", "lat": 25.2731, "lon": 51.6081 },
+  "WSSS": { "iata": "SIN", "city": "Singapore", "country": "Singapore", "lat": 1.3502, "lon": 103.9944 },
+  "WMKK": { "iata": "KUL", "city": "Kuala Lumpur", "country": "Malaysia", "lat": 2.7456, "lon": 101.7099 },
+  "VTBS": { "iata": "BKK", "city": "Bangkok", "country": "Thailand", "lat": 13.6900, "lon": 100.7501 },
+  "VHHH": { "iata": "HKG", "city": "Hong Kong", "country": "Hong Kong", "lat": 22.3080, "lon": 113.9185 },
+  "RKSI": { "iata": "ICN", "city": "Seoul", "country": "South Korea", "lat": 37.4691, "lon": 126.4505 },
+  "FAOR": { "iata": "JNB", "city": "Johannesburg", "country": "South Africa", "lat": -26.1392, "lon": 28.2460 },
+  "KJFK": { "iata": "JFK", "city": "New York", "country": "United States", "lat": 40.6398, "lon": -73.7789 },
+  "KBOS": { "iata": "BOS", "city": "Boston", "country": "United States", "lat": 42.3656, "lon": -71.0096 },
+  "KIAD": { "iata": "IAD", "city": "Washington", "country": "United States", "lat": 38.9445, "lon": -77.4558 },
+  "KMIA": { "iata": "MIA", "city": "Miami", "country": "United States", "lat": 25.7932, "lon": -80.2906 },
+  "KORD": { "iata": "ORD", "city": "Chicago", "country": "United States", "lat": 41.9786, "lon": -87.9048 },
+  "KDFW": { "iata": "DFW", "city": "Dallas", "country": "United States", "lat": 32.8968, "lon": -97.0380 },
+  "KLAX": { "iata": "LAX", "city": "Los Angeles", "country": "United States", "lat": 33.9425, "lon": -118.4081 },
+  "KSFO": { "iata": "SFO", "city": "San Francisco", "country": "United States", "lat": 37.6189, "lon": -122.3750 },
+  "YSSY": { "iata": "SYD", "city": "Sydney", "country": "Australia", "lat": -33.9461, "lon": 151.1772 },
+  "YMML": { "iata": "MEL", "city": "Melbourne", "country": "Australia", "lat": -37.6733, "lon": 144.8433 }
+}

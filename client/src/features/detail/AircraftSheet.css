@@ -1,0 +1,535 @@
+/*
+ * AircraftSheet — bottom sheet on a phone, side panel from 900px.
+ *
+ * The panel keeps a fixed header and footer with a single scrolling body, so the flight number
+ * and the "Show on map" action stay reachable one-handed however long the movement log is.
+ */
+
+.det-root {
+  --det-accent: var(--brand-cyan);
+
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.det-scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  cursor: default;
+  animation: det-fade var(--dur) var(--ease);
+}
+
+.det-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: min(90dvh, 940px);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  background: var(--surface-1);
+  box-shadow: var(--shadow-lg);
+  animation: det-rise var(--dur-slow) var(--ease-out);
+  /* Only used to spring back after an incomplete drag. */
+  transition: transform var(--dur) var(--ease);
+  will-change: transform;
+}
+
+/* ---- Grab handle ------------------------------------------------------------- */
+
+.det-grab {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  flex: none;
+  touch-action: none;
+  cursor: grab;
+}
+
+.det-grab-bar {
+  width: 42px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--line-strong);
+}
+
+/* ---- Header ------------------------------------------------------------------- */
+
+.det-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  flex: none;
+  padding: var(--space-2) var(--space-3) var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--det-accent) 14%, transparent),
+    transparent
+  );
+  touch-action: none;
+}
+
+.det-head::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--det-accent);
+}
+
+.det-head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.det-head-operator {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.det-head-title {
+  margin-top: 2px;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.det-head-reg {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.det-head-reg-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text);
+}
+
+.det-head-reg-none {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.det-head-hex {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+}
+
+.det-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.det-close:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* ---- Body ---------------------------------------------------------------------- */
+
+.det-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  gap: var(--space-6);
+  align-content: start;
+  padding: var(--space-5);
+}
+
+.det-section {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.det-section-head {
+  color: var(--text-muted);
+}
+
+.det-note {
+  max-width: 60ch;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.det-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.det-live-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.det-live-eta {
+  color: var(--arrival);
+}
+
+/* ---- Route ---------------------------------------------------------------------- */
+
+.det-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.det-route-end {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.det-route-end:last-child {
+  text-align: end;
+}
+
+.det-route-code {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.det-route-code--none {
+  color: var(--text-muted);
+}
+
+.det-route-city {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.det-route-link {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  color: var(--det-accent);
+}
+
+.det-route-track {
+  position: absolute;
+  inset-inline: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--line-strong) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.det-route-plane {
+  position: relative;
+  transform: rotate(90deg);
+}
+
+/* ---- Airframe -------------------------------------------------------------------- */
+
+.det-airframe-note {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-accent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--brand-cyan) 8%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* ---- History ---------------------------------------------------------------------- */
+
+.det-history {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.det-history-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+}
+
+.det-history-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+}
+
+.det-history-icon--arrival {
+  color: var(--arrival);
+}
+
+.det-history-icon--departure {
+  color: var(--departure);
+}
+
+.det-history-main {
+  display: grid;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.det-history-flight {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.det-history-city {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.det-history-when {
+  display: grid;
+  gap: 1px;
+  flex: none;
+  text-align: end;
+}
+
+.det-history-time {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.det-history-meta {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ---- Loading, errors, footnote ------------------------------------------------------ */
+
+.det-skeleton {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.det-error {
+  padding: var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.det-error-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.det-retry {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-target);
+  padding-inline: var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.det-retry:hover {
+  border-color: var(--text-muted);
+}
+
+.det-updated {
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+}
+
+/* ---- Footer action -------------------------------------------------------------------- */
+
+.det-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) calc(var(--space-3) + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface-1);
+}
+
+.det-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: var(--tap-target);
+  padding-inline: var(--space-5);
+  border: 1px solid var(--line-accent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--brand-cyan) 14%, transparent);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--brand-cyan);
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.det-action:hover {
+  background: color-mix(in srgb, var(--brand-cyan) 24%, transparent);
+  border-color: var(--brand-cyan);
+}
+
+/* ---- Animations ------------------------------------------------------------------------ */
+
+@keyframes det-rise {
+  from {
+    transform: translateY(8%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes det-slide {
+  from {
+    transform: translateX(4%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes det-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---- Tablet ------------------------------------------------------------------------------ */
+
+@media (min-width: 560px) {
+  .det-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .det-actions {
+    justify-content: flex-end;
+  }
+
+  .det-action {
+    flex: 0 0 auto;
+  }
+}
+
+/* ---- Desktop: a side panel, not a sheet -------------------------------------------------- */
+
+@media (min-width: 900px) {
+  .det-root {
+    align-items: stretch;
+    justify-content: flex-end;
+  }
+
+  .det-panel {
+    width: min(460px, 100%);
+    max-height: none;
+    height: 100dvh;
+    border: 1px solid var(--line);
+    border-inline-end: 0;
+    border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+    animation-name: det-slide;
+  }
+
+  .det-grab {
+    display: none;
+  }
+
+  .det-head {
+    padding-top: var(--space-5);
+  }
+
+  .det-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .det-panel,
+  .det-scrim {
+    animation: none;
+    transition: none;
+  }
+}

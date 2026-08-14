@@ -1,0 +1,350 @@
+/*
+ * SpotCard — collapsed summary plus a disclosure drawer.
+ *
+ * The drawer animates with grid-template-rows so the card never measures anything in JS and
+ * never jumps when the ranking refreshes underneath it. Collapsed content is hidden with
+ * `visibility` as well as height, which keeps it out of the tab order and the a11y tree.
+ */
+
+.spot.ui-card {
+  padding: 0;
+}
+
+.spot--open.ui-card {
+  border-color: var(--line-strong);
+  background: var(--surface-3);
+}
+
+@media (hover: hover) {
+  .spot.ui-card:hover {
+    border-color: var(--line-strong);
+  }
+}
+
+/* ---- Summary ------------------------------------------------------------------ */
+
+/* The heading exists for the outline only — every size inside it is set explicitly. */
+.spot-heading {
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  letter-spacing: normal;
+  line-height: 1.5;
+}
+
+.spot-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-4);
+  /* Clears the Card accent strip. */
+  padding-inline-start: calc(var(--space-4) + 3px);
+  text-align: left;
+  color: inherit;
+}
+
+.spot-toggle:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: -3px;
+  border-radius: var(--radius-lg);
+}
+
+.spot-main {
+  display: grid;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+}
+
+.spot-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.spot-name {
+  min-width: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+/* ---- Rating badge --------------------------------------------------------------- */
+
+.spot-rating {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-2);
+  padding: 3px var(--space-2) 3px var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--spot-rating-colour) 40%, transparent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--spot-rating-colour) 14%, transparent);
+  color: var(--spot-rating-colour);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.spot-rating--excellent {
+  --spot-rating-colour: var(--brand-cyan);
+}
+
+.spot-rating--good {
+  --spot-rating-colour: var(--success);
+}
+
+.spot-rating--fair {
+  --spot-rating-colour: var(--warning);
+}
+
+.spot-rating--poor {
+  --spot-rating-colour: var(--text-muted);
+}
+
+/* Fixed width so a score moving 99 → 100 cannot nudge the name beside it. */
+.spot-score {
+  min-width: 2.4ch;
+  padding-inline-start: var(--space-2);
+  border-inline-start: 1px solid color-mix(in srgb, var(--spot-rating-colour) 32%, transparent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  text-align: right;
+}
+
+/* ---- Summary body ---------------------------------------------------------------- */
+
+.spot-tagline {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--text-base);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.spot--open .spot-tagline,
+.spot--open .spot-lead {
+  -webkit-line-clamp: none;
+  line-clamp: none;
+  overflow: visible;
+}
+
+.spot-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.spot-lead {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.spot-chevron {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  color: var(--text-muted);
+  transform: rotate(90deg);
+  transition: transform var(--dur) var(--ease);
+}
+
+.spot--open .spot-chevron {
+  transform: rotate(-90deg);
+  color: var(--brand-cyan);
+}
+
+/* ---- Drawer ----------------------------------------------------------------------- */
+
+.spot-drawer {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-slow) var(--ease);
+}
+
+.spot--open .spot-drawer {
+  grid-template-rows: 1fr;
+}
+
+.spot-drawer-inner {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s linear var(--dur-slow);
+}
+
+.spot--open .spot-drawer-inner {
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.spot-detail {
+  display: grid;
+  gap: var(--space-5);
+  margin-inline: var(--space-4);
+  margin-inline-start: calc(var(--space-4) + 3px);
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.spot-block {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.spot-block-title {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ---- Reasons, verbatim ------------------------------------------------------------- */
+
+.spot-reasons {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.spot-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.spot-reason::before {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin-top: 0.5em;
+  border-radius: var(--radius-full);
+  background: var(--brand-cyan);
+}
+
+.spot-light-meaning {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.spot-light-meaning strong {
+  color: var(--text);
+}
+
+.spot-plain {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.spot-runways {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- Facts --------------------------------------------------------------------------- */
+
+.spot-facts {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.spot-fact dt {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.spot-fact dd {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.spot-coords {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* ---- Actions -------------------------------------------------------------------------- */
+
+.spot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.spot-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  transition:
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
+}
+
+.spot-action:hover {
+  border-color: var(--line-accent);
+  background: color-mix(in srgb, var(--brand-cyan) 12%, var(--surface-3));
+  color: var(--text);
+}
+
+/* ---- Wider screens --------------------------------------------------------------------- */
+
+@media (min-width: 600px) {
+  .spot-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3) var(--space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spot-drawer,
+  .spot-chevron,
+  .spot-action {
+    transition: none;
+  }
+
+  .spot-drawer-inner {
+    transition-delay: 0s;
+  }
+}

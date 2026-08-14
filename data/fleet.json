@@ -1,0 +1,2532 @@
+[
+  {
+    "reg": "G-XLEA",
+    "hex": "40688b",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "095",
+    "delivered": 2013,
+    "seats": 469,
+    "note": "British Airways' first A380, delivered July 2013"
+  },
+  {
+    "reg": "G-XLEB",
+    "hex": "40688c",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "121",
+    "delivered": 2013,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEC",
+    "hex": "40688d",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "124",
+    "delivered": 2013,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLED",
+    "hex": "406a03",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "144",
+    "delivered": 2014,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEE",
+    "hex": "406a04",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "148",
+    "delivered": 2014,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEF",
+    "hex": "406a05",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "151",
+    "delivered": 2014,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEG",
+    "hex": "406b20",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "161",
+    "delivered": 2014,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEH",
+    "hex": "406b21",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "163",
+    "delivered": 2014,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEI",
+    "hex": "406b22",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "173",
+    "delivered": 2015,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEJ",
+    "hex": "406d1a",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "192",
+    "delivered": 2015,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEK",
+    "hex": "406ec9",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "194",
+    "delivered": 2016,
+    "seats": 469,
+    "note": null
+  },
+  {
+    "reg": "G-XLEL",
+    "hex": "406ec7",
+    "operatorIcao": "BAW",
+    "operator": "British Airways",
+    "msn": "215",
+    "delivered": 2016,
+    "seats": 469,
+    "note": "British Airways' twelfth and last A380, delivered June 2016"
+  },
+  {
+    "reg": "A6-EDA",
+    "hex": "8960e2",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "011",
+    "delivered": 2008,
+    "seats": 489,
+    "note": "Emirates' first A380, delivered July 2008; scrapped at Dubai World Central"
+  },
+  {
+    "reg": "A6-EDB",
+    "hex": "8960e3",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "013",
+    "delivered": 2008,
+    "seats": 489,
+    "note": "Withdrawn from use and scrapped at Tarbes"
+  },
+  {
+    "reg": "A6-EDC",
+    "hex": "8960e4",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "016",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDD",
+    "hex": "8960e5",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "020",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDE",
+    "hex": "8960e6",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "017",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDF",
+    "hex": "8960e7",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "007",
+    "delivered": 2009,
+    "seats": 489,
+    "note": "MSN 007 - built as an A380-841 and converted to Engine Alliance -861 power"
+  },
+  {
+    "reg": "A6-EDG",
+    "hex": "8960e8",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "023",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDH",
+    "hex": "8960e9",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "025",
+    "delivered": 2010,
+    "seats": 489,
+    "note": "The 6,000th Airbus ever built; later wore the Expo 2020 Dubai candidate livery"
+  },
+  {
+    "reg": "A6-EDI",
+    "hex": "8960ea",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "028",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDJ",
+    "hex": "8960eb",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "009",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDK",
+    "hex": "8960ec",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "030",
+    "delivered": 2010,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDL",
+    "hex": "8960ed",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "046",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDM",
+    "hex": "8960ee",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "042",
+    "delivered": 2010,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDN",
+    "hex": "8960ef",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "056",
+    "delivered": 2010,
+    "seats": 489,
+    "note": "Wore the Rugby World Cup 2011 livery"
+  },
+  {
+    "reg": "A6-EDO",
+    "hex": "8960f0",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "057",
+    "delivered": 2010,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDP",
+    "hex": "8960f1",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "077",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDQ",
+    "hex": "8960f2",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "080",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDR",
+    "hex": "8960f3",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "083",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDS",
+    "hex": "8960f4",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "086",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDT",
+    "hex": "8960f5",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "090",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDU",
+    "hex": "8960f6",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "098",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDV",
+    "hex": "8960f7",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "101",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDW",
+    "hex": "8960f8",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "103",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDX",
+    "hex": "8960f9",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "105",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDY",
+    "hex": "8960fa",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "106",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EDZ",
+    "hex": "8960fb",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "107",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEA",
+    "hex": "896180",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "108",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEB",
+    "hex": "896181",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "109",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEC",
+    "hex": "896182",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "110",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EED",
+    "hex": "896183",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "111",
+    "delivered": 2012,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEE",
+    "hex": "896184",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "112",
+    "delivered": 2012,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEF",
+    "hex": "896185",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "113",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEG",
+    "hex": "896186",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "116",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEH",
+    "hex": "896187",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "119",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEI",
+    "hex": "896188",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "123",
+    "delivered": 2013,
+    "seats": 489,
+    "note": "Wore England Rugby 2015, then United for Wildlife liveries"
+  },
+  {
+    "reg": "A6-EEJ",
+    "hex": "896189",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "127",
+    "delivered": 2013,
+    "seats": 489,
+    "note": "Wears the 'Journey to the Future' livery"
+  },
+  {
+    "reg": "A6-EEK",
+    "hex": "89618a",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "132",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEL",
+    "hex": "89618b",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "133",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEM",
+    "hex": "89618c",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "134",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEN",
+    "hex": "89618d",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "135",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEO",
+    "hex": "89618e",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "136",
+    "delivered": 2013,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEP",
+    "hex": "89618f",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "138",
+    "delivered": 2013,
+    "seats": 489,
+    "note": "Wears the Emirates Foundation livery"
+  },
+  {
+    "reg": "A6-EEQ",
+    "hex": "896190",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "141",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EER",
+    "hex": "896191",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "139",
+    "delivered": 2013,
+    "seats": 489,
+    "note": "Wore the FA Cup and United for Wildlife liveries"
+  },
+  {
+    "reg": "A6-EES",
+    "hex": "896192",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "140",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EET",
+    "hex": "896193",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "142",
+    "delivered": 2014,
+    "seats": 489,
+    "note": "Has worn England Rugby, AC Milan and Paris Saint-Germain liveries"
+  },
+  {
+    "reg": "A6-EEU",
+    "hex": "896194",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "147",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEV",
+    "hex": "896195",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "150",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEW",
+    "hex": "896196",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "153",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEX",
+    "hex": "896197",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "154",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEY",
+    "hex": "896198",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "157",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EEZ",
+    "hex": "896199",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "158",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOA",
+    "hex": "89639a",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "159",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOB",
+    "hex": "89639b",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "164",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOC",
+    "hex": "89639c",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "165",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOD",
+    "hex": "89639d",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "168",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOE",
+    "hex": "89639e",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "169",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOF",
+    "hex": "89639f",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "171",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOG",
+    "hex": "8963e4",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "172",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOH",
+    "hex": "8963e5",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "174",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOI",
+    "hex": "8963e6",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "178",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOJ",
+    "hex": "8963e7",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "182",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOK",
+    "hex": "8963e8",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "184",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOL",
+    "hex": "8963e9",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "186",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOM",
+    "hex": "8963ea",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "187",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EON",
+    "hex": "8963eb",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "188",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOO",
+    "hex": "8963ec",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "190",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOP",
+    "hex": "8963ed",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "200",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOQ",
+    "hex": "8963ee",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "201",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOR",
+    "hex": "8963ef",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "202",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOS",
+    "hex": "8963f0",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "203",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOT",
+    "hex": "8963f1",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "204",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOU",
+    "hex": "8963f2",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "205",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOV",
+    "hex": "8963f3",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "206",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOW",
+    "hex": "8963f4",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "207",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOX",
+    "hex": "8963f5",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "208",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOY",
+    "hex": "8963f6",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "209",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EOZ",
+    "hex": "8963f7",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "210",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUA",
+    "hex": "896456",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "211",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUB",
+    "hex": "896457",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "213",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUC",
+    "hex": "896458",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "214",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUD",
+    "hex": "896459",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "216",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUE",
+    "hex": "89645a",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "217",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUF",
+    "hex": "89645b",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "218",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUG",
+    "hex": "896471",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "219",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUH",
+    "hex": "896472",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "220",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUI",
+    "hex": "896473",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "221",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUJ",
+    "hex": "896474",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "222",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUK",
+    "hex": "896475",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "223",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUL",
+    "hex": "896476",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "224",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUM",
+    "hex": "896477",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "225",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUN",
+    "hex": "896478",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "226",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUO",
+    "hex": "896479",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "227",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUP",
+    "hex": "89647a",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "228",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUQ",
+    "hex": "89647b",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "229",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUR",
+    "hex": "89647c",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "232",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUS",
+    "hex": "89647d",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "234",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUT",
+    "hex": "89647e",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "236",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUU",
+    "hex": "89647f",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "238",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUV",
+    "hex": "896480",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "239",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUW",
+    "hex": "896481",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "240",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUX",
+    "hex": "896482",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "241",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUY",
+    "hex": "896483",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "242",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EUZ",
+    "hex": "896484",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "244",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVA",
+    "hex": "8964af",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "167",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVB",
+    "hex": "8964b0",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "162",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVC",
+    "hex": "8964b1",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "248",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVD",
+    "hex": "8964b2",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "249",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVE",
+    "hex": "8964b3",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVF",
+    "hex": "8964b4",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVG",
+    "hex": "8964b5",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVH",
+    "hex": "8964b6",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVI",
+    "hex": "8964b7",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVJ",
+    "hex": "8964e1",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVK",
+    "hex": "8964e2",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVL",
+    "hex": "8964e3",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVM",
+    "hex": "896523",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVN",
+    "hex": "89655a",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVO",
+    "hex": "89655b",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "268",
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVP",
+    "hex": "89655c",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVQ",
+    "hex": "89655d",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVR",
+    "hex": "89655e",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": null,
+    "delivered": null,
+    "seats": 489,
+    "note": null
+  },
+  {
+    "reg": "A6-EVS",
+    "hex": "89655f",
+    "operatorIcao": "UAE",
+    "operator": "Emirates",
+    "msn": "272",
+    "delivered": 2021,
+    "seats": 489,
+    "note": "The 251st and final A380 built, delivered to Emirates on 16 December 2021"
+  },
+  {
+    "reg": "9V-SKA",
+    "hex": "76cd61",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "003",
+    "delivered": 2007,
+    "seats": 471,
+    "note": "Flew the world's first A380 commercial service, SQ380 to Sydney, 25 Oct 2007"
+  },
+  {
+    "reg": "9V-SKB",
+    "hex": "76cd62",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "005",
+    "delivered": 2008,
+    "seats": 471,
+    "note": "Second A380 delivered; later Hi Fly's 9H-DPB, scrapped at Tarbes"
+  },
+  {
+    "reg": "9V-SKC",
+    "hex": "76cd63",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "006",
+    "delivered": 2008,
+    "seats": 471,
+    "note": "Became Hi Fly's 9H-MIP and its blue 'Save the Coral Reefs' livery"
+  },
+  {
+    "reg": "9V-SKD",
+    "hex": "76cd64",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "008",
+    "delivered": 2008,
+    "seats": 471,
+    "note": "Withdrawn from use and scrapped at Tarbes"
+  },
+  {
+    "reg": "9V-SKE",
+    "hex": "76cd65",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "010",
+    "delivered": 2008,
+    "seats": 471,
+    "note": "Withdrawn from use and scrapped at Tarbes"
+  },
+  {
+    "reg": "9V-SKF",
+    "hex": "76cd66",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "012",
+    "delivered": 2008,
+    "seats": 471,
+    "note": "In long-term storage at Singapore"
+  },
+  {
+    "reg": "9V-SKG",
+    "hex": "76cd67",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "019",
+    "delivered": 2009,
+    "seats": 471,
+    "note": "Withdrawn from use and being parted out at Singapore"
+  },
+  {
+    "reg": "9V-SKH",
+    "hex": "76cd68",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "021",
+    "delivered": 2009,
+    "seats": 471,
+    "note": "Withdrawn from use and scrapped at Singapore"
+  },
+  {
+    "reg": "9V-SKI",
+    "hex": "76cd69",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "034",
+    "delivered": 2009,
+    "seats": 471,
+    "note": "Wore Singapore's SG50 golden anniversary livery, 2015-2017"
+  },
+  {
+    "reg": "9V-SKJ",
+    "hex": "76cd6a",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "045",
+    "delivered": 2009,
+    "seats": 471,
+    "note": "Wore Singapore's SG50 golden anniversary livery, 2015-2017"
+  },
+  {
+    "reg": "9V-SKK",
+    "hex": "76cd6b",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "051",
+    "delivered": 2010,
+    "seats": 471,
+    "note": "In long-term storage at Alice Springs"
+  },
+  {
+    "reg": "9V-SKL",
+    "hex": "76cd6c",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "058",
+    "delivered": 2011,
+    "seats": 471,
+    "note": "In long-term storage at Alice Springs"
+  },
+  {
+    "reg": "9V-SKM",
+    "hex": "76cd6d",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "065",
+    "delivered": 2011,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKN",
+    "hex": "76cd6e",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "071",
+    "delivered": 2011,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKP",
+    "hex": "76cd70",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "076",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKQ",
+    "hex": "76cd71",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "079",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKR",
+    "hex": "76cd72",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "082",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKS",
+    "hex": "76cd73",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "085",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKT",
+    "hex": "76cd74",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "092",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKU",
+    "hex": "76cd75",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "243",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKV",
+    "hex": "76cd76",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": "247",
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKW",
+    "hex": "76cd77",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": null,
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKY",
+    "hex": "76cd79",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": null,
+    "delivered": null,
+    "seats": 471,
+    "note": null
+  },
+  {
+    "reg": "9V-SKZ",
+    "hex": "76cd7a",
+    "operatorIcao": "SIA",
+    "operator": "Singapore Airlines",
+    "msn": null,
+    "delivered": null,
+    "seats": 471,
+    "note": "Singapore's last A380, and the last of the 24 they ordered"
+  },
+  {
+    "reg": "VH-OQA",
+    "hex": "7c4920",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "014",
+    "delivered": 2008,
+    "seats": 485,
+    "note": "'Nancy-Bird Walton' - the QF32 aircraft, rebuilt after the 2010 engine failure"
+  },
+  {
+    "reg": "VH-OQB",
+    "hex": "7c4921",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "015",
+    "delivered": 2008,
+    "seats": 485,
+    "note": "'Hudson Fysh', named for a Qantas founder; delivered December 2008"
+  },
+  {
+    "reg": "VH-OQC",
+    "hex": "7c4922",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "022",
+    "delivered": 2008,
+    "seats": 485,
+    "note": null
+  },
+  {
+    "reg": "VH-OQD",
+    "hex": "7c4923",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "026",
+    "delivered": 2009,
+    "seats": 485,
+    "note": null
+  },
+  {
+    "reg": "VH-OQE",
+    "hex": "7c4924",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "027",
+    "delivered": 2009,
+    "seats": 485,
+    "note": "Retired to Victorville in 2020 and scrapped there in 2023"
+  },
+  {
+    "reg": "VH-OQF",
+    "hex": "7c4925",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "029",
+    "delivered": 2010,
+    "seats": 485,
+    "note": "Retired to Victorville in 2020 and scrapped there in 2023"
+  },
+  {
+    "reg": "VH-OQG",
+    "hex": "7c4926",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "047",
+    "delivered": 2010,
+    "seats": 485,
+    "note": null
+  },
+  {
+    "reg": "VH-OQH",
+    "hex": "7c4927",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "050",
+    "delivered": 2011,
+    "seats": 485,
+    "note": "Wore the 'Go Wallabies' livery, 2015-2016"
+  },
+  {
+    "reg": "VH-OQI",
+    "hex": "7c4928",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "055",
+    "delivered": null,
+    "seats": 485,
+    "note": null
+  },
+  {
+    "reg": "VH-OQJ",
+    "hex": "7c4929",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "062",
+    "delivered": 2011,
+    "seats": 485,
+    "note": null
+  },
+  {
+    "reg": "VH-OQK",
+    "hex": "7c492a",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "063",
+    "delivered": 2011,
+    "seats": 485,
+    "note": "Wore the 'Spirit of Australians' livery in 2012"
+  },
+  {
+    "reg": "VH-OQL",
+    "hex": "7c492b",
+    "operatorIcao": "QFA",
+    "operator": "Qantas",
+    "msn": "074",
+    "delivered": 2011,
+    "seats": 485,
+    "note": null
+  },
+  {
+    "reg": "A7-APA",
+    "hex": "06a142",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "137",
+    "delivered": 2014,
+    "seats": 517,
+    "note": "Qatar Airways' first A380, delivered September 2014"
+  },
+  {
+    "reg": "A7-APB",
+    "hex": "06a143",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "143",
+    "delivered": 2014,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APC",
+    "hex": "06a144",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "145",
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APD",
+    "hex": "06a145",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "160",
+    "delivered": 2014,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APE",
+    "hex": "06a146",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "181",
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APF",
+    "hex": "06a147",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "189",
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APG",
+    "hex": "06a148",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "193",
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APH",
+    "hex": "06a149",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "197",
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-API",
+    "hex": "06a14a",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": "235",
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A7-APJ",
+    "hex": "06a14b",
+    "operatorIcao": "QTR",
+    "operator": "Qatar Airways",
+    "msn": null,
+    "delivered": null,
+    "seats": 517,
+    "note": null
+  },
+  {
+    "reg": "A6-APA",
+    "hex": "8963cd",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "166",
+    "delivered": 2014,
+    "seats": 486,
+    "note": "Etihad's first A380, carrying The Residence three-room suite"
+  },
+  {
+    "reg": "A6-APB",
+    "hex": "896405",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "170",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APC",
+    "hex": "896406",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "176",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APD",
+    "hex": "896407",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "180",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APE",
+    "hex": "896439",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "191",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APF",
+    "hex": "896461",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "195",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APG",
+    "hex": "896462",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "198",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APH",
+    "hex": "896463",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "199",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-API",
+    "hex": "89649d",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "233",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "A6-APJ",
+    "hex": "89649e",
+    "operatorIcao": "ETD",
+    "operator": "Etihad Airways",
+    "msn": "237",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "HL7611",
+    "hex": "71be11",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "035",
+    "delivered": 2011,
+    "seats": 407,
+    "note": "Korean Air's first A380, delivered May 2011"
+  },
+  {
+    "reg": "HL7612",
+    "hex": "71be12",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "039",
+    "delivered": null,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "HL7613",
+    "hex": "71be13",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "059",
+    "delivered": 2011,
+    "seats": 407,
+    "note": "Withdrawn from use and scrapped at Seoul Incheon"
+  },
+  {
+    "reg": "HL7614",
+    "hex": "71be14",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "068",
+    "delivered": 2011,
+    "seats": 407,
+    "note": "Withdrawn from use and being parted out at Seoul Incheon"
+  },
+  {
+    "reg": "HL7615",
+    "hex": "71be15",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "075",
+    "delivered": null,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "HL7619",
+    "hex": "71be19",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "096",
+    "delivered": null,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "HL7621",
+    "hex": "71be21",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "126",
+    "delivered": 2013,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "HL7622",
+    "hex": "71be22",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "128",
+    "delivered": 2013,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "HL7627",
+    "hex": "71be27",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "130",
+    "delivered": 2014,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "HL7628",
+    "hex": "71be28",
+    "operatorIcao": "KAL",
+    "operator": "Korean Air",
+    "msn": "156",
+    "delivered": null,
+    "seats": 407,
+    "note": null
+  },
+  {
+    "reg": "9M-MNA",
+    "hex": "75028e",
+    "operatorIcao": "MAS",
+    "operator": "Malaysia Airlines",
+    "msn": "078",
+    "delivered": 2012,
+    "seats": 486,
+    "note": "Malaysia Airlines' first A380, delivered May 2012"
+  },
+  {
+    "reg": "9M-MNB",
+    "hex": "75028f",
+    "operatorIcao": "MAS",
+    "operator": "Malaysia Airlines",
+    "msn": "081",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "9M-MNC",
+    "hex": "750290",
+    "operatorIcao": "MAS",
+    "operator": "Malaysia Airlines",
+    "msn": "084",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "9M-MND",
+    "hex": "750291",
+    "operatorIcao": "MAS",
+    "operator": "Malaysia Airlines",
+    "msn": "089",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "9M-MNE",
+    "hex": "750292",
+    "operatorIcao": "MAS",
+    "operator": "Malaysia Airlines",
+    "msn": "094",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "9M-MNF",
+    "hex": "750293",
+    "operatorIcao": "MAS",
+    "operator": "Malaysia Airlines",
+    "msn": "114",
+    "delivered": null,
+    "seats": 486,
+    "note": null
+  },
+  {
+    "reg": "HL7625",
+    "hex": "71be25",
+    "operatorIcao": "AAR",
+    "operator": "Asiana Airlines",
+    "msn": "152",
+    "delivered": 2014,
+    "seats": 495,
+    "note": "Asiana's first A380, delivered May 2014"
+  },
+  {
+    "reg": "HL7626",
+    "hex": "71be26",
+    "operatorIcao": "AAR",
+    "operator": "Asiana Airlines",
+    "msn": "155",
+    "delivered": null,
+    "seats": 495,
+    "note": null
+  },
+  {
+    "reg": "HL7634",
+    "hex": "71be34",
+    "operatorIcao": "AAR",
+    "operator": "Asiana Airlines",
+    "msn": "179",
+    "delivered": null,
+    "seats": 495,
+    "note": null
+  },
+  {
+    "reg": "HL7635",
+    "hex": "71be35",
+    "operatorIcao": "AAR",
+    "operator": "Asiana Airlines",
+    "msn": "183",
+    "delivered": null,
+    "seats": 495,
+    "note": null
+  },
+  {
+    "reg": "HL7640",
+    "hex": "71be40",
+    "operatorIcao": "AAR",
+    "operator": "Asiana Airlines",
+    "msn": "230",
+    "delivered": null,
+    "seats": 495,
+    "note": null
+  },
+  {
+    "reg": "HL7641",
+    "hex": "71be41",
+    "operatorIcao": "AAR",
+    "operator": "Asiana Airlines",
+    "msn": "231",
+    "delivered": null,
+    "seats": 495,
+    "note": null
+  },
+  {
+    "reg": "D-AIMA",
+    "hex": "3c65a1",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "038",
+    "delivered": null,
+    "seats": 509,
+    "note": "Lufthansa's first A380, named 'Frankfurt am Main'"
+  },
+  {
+    "reg": "D-AIMB",
+    "hex": "3c65a2",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "041",
+    "delivered": 2010,
+    "seats": 509,
+    "note": "Named 'Muenchen'; wore an FC Bayern Muenchen livery in 2013"
+  },
+  {
+    "reg": "D-AIMC",
+    "hex": "3c65a3",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "044",
+    "delivered": 2010,
+    "seats": 509,
+    "note": "Named 'Peking'"
+  },
+  {
+    "reg": "D-AIMD",
+    "hex": "3c65a4",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "048",
+    "delivered": 2010,
+    "seats": 509,
+    "note": "Named 'Tokio'; stored at Teruel"
+  },
+  {
+    "reg": "D-AIME",
+    "hex": "3c65a5",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "061",
+    "delivered": 2011,
+    "seats": 509,
+    "note": "Stored at Teruel"
+  },
+  {
+    "reg": "D-AIMF",
+    "hex": "3c65a6",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "066",
+    "delivered": 2011,
+    "seats": 509,
+    "note": "Sold back to Airbus as F-WTAP; stored at Teruel"
+  },
+  {
+    "reg": "D-AIMG",
+    "hex": "3c65a7",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "069",
+    "delivered": 2011,
+    "seats": 509,
+    "note": "Stored at Teruel"
+  },
+  {
+    "reg": "D-AIMH",
+    "hex": "3c65a8",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "070",
+    "delivered": 2011,
+    "seats": 509,
+    "note": null
+  },
+  {
+    "reg": "D-AIMI",
+    "hex": "3c65a9",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "072",
+    "delivered": null,
+    "seats": 509,
+    "note": null
+  },
+  {
+    "reg": "D-AIMJ",
+    "hex": "3c65aa",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "073",
+    "delivered": 2012,
+    "seats": 509,
+    "note": "Stored at Teruel"
+  },
+  {
+    "reg": "D-AIMK",
+    "hex": "3c65ab",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "146",
+    "delivered": null,
+    "seats": 509,
+    "note": null
+  },
+  {
+    "reg": "D-AIML",
+    "hex": "3c65ac",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "149",
+    "delivered": null,
+    "seats": 509,
+    "note": null
+  },
+  {
+    "reg": "D-AIMM",
+    "hex": "3c65ad",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "175",
+    "delivered": null,
+    "seats": 509,
+    "note": null
+  },
+  {
+    "reg": "D-AIMN",
+    "hex": "3c65ae",
+    "operatorIcao": "DLH",
+    "operator": "Lufthansa",
+    "msn": "177",
+    "delivered": null,
+    "seats": 509,
+    "note": null
+  },
+  {
+    "reg": "HS-TUA",
+    "hex": "8852a1",
+    "operatorIcao": "THA",
+    "operator": "Thai Airways International",
+    "msn": "087",
+    "delivered": 2012,
+    "seats": 507,
+    "note": "Thai Airways' first A380, delivered September 2012"
+  },
+  {
+    "reg": "HS-TUB",
+    "hex": "8852a2",
+    "operatorIcao": "THA",
+    "operator": "Thai Airways International",
+    "msn": "093",
+    "delivered": null,
+    "seats": 507,
+    "note": null
+  },
+  {
+    "reg": "HS-TUC",
+    "hex": "8852a3",
+    "operatorIcao": "THA",
+    "operator": "Thai Airways International",
+    "msn": "100",
+    "delivered": null,
+    "seats": 507,
+    "note": null
+  },
+  {
+    "reg": "HS-TUD",
+    "hex": "8852a4",
+    "operatorIcao": "THA",
+    "operator": "Thai Airways International",
+    "msn": "122",
+    "delivered": 2013,
+    "seats": 507,
+    "note": "In long-term storage at Bangkok"
+  },
+  {
+    "reg": "HS-TUE",
+    "hex": "8852a5",
+    "operatorIcao": "THA",
+    "operator": "Thai Airways International",
+    "msn": "125",
+    "delivered": null,
+    "seats": 507,
+    "note": null
+  },
+  {
+    "reg": "HS-TUF",
+    "hex": "8852a6",
+    "operatorIcao": "THA",
+    "operator": "Thai Airways International",
+    "msn": "131",
+    "delivered": 2013,
+    "seats": 507,
+    "note": "Withdrawn from use and being parted out at U-Tapao"
+  },
+  {
+    "reg": "B-6136",
+    "hex": "780736",
+    "operatorIcao": "CSN",
+    "operator": "China Southern Airlines",
+    "msn": "031",
+    "delivered": 2011,
+    "seats": 506,
+    "note": "China Southern's first A380, delivered October 2011; parted out at Mojave"
+  },
+  {
+    "reg": "B-6137",
+    "hex": "780737",
+    "operatorIcao": "CSN",
+    "operator": "China Southern Airlines",
+    "msn": "036",
+    "delivered": null,
+    "seats": 506,
+    "note": null
+  },
+  {
+    "reg": "B-6138",
+    "hex": "7807bc",
+    "operatorIcao": "CSN",
+    "operator": "China Southern Airlines",
+    "msn": "054",
+    "delivered": 2012,
+    "seats": 506,
+    "note": "In long-term storage at Mojave"
+  },
+  {
+    "reg": "B-6139",
+    "hex": "7808b0",
+    "operatorIcao": "CSN",
+    "operator": "China Southern Airlines",
+    "msn": "088",
+    "delivered": null,
+    "seats": 506,
+    "note": null
+  },
+  {
+    "reg": "B-6140",
+    "hex": "780994",
+    "operatorIcao": "CSN",
+    "operator": "China Southern Airlines",
+    "msn": "120",
+    "delivered": 2013,
+    "seats": 506,
+    "note": "Sold to Global Airlines in 2023 and re-registered 9H-GLOBL"
+  },
+  {
+    "reg": "F-HPJA",
+    "hex": "39bd20",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "033",
+    "delivered": 2009,
+    "seats": 516,
+    "note": "Air France's first A380, delivered October 2009; scrapped at Tarbes"
+  },
+  {
+    "reg": "F-HPJB",
+    "hex": "39bd21",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "040",
+    "delivered": null,
+    "seats": 516,
+    "note": null
+  },
+  {
+    "reg": "F-HPJC",
+    "hex": "39bd22",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "043",
+    "delivered": 2010,
+    "seats": 516,
+    "note": "Withdrawn from use and scrapped at Tarbes"
+  },
+  {
+    "reg": "F-HPJD",
+    "hex": "39bd23",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "049",
+    "delivered": 2010,
+    "seats": 516,
+    "note": "Withdrawn from use and scrapped at Tarbes"
+  },
+  {
+    "reg": "F-HPJE",
+    "hex": "39bd24",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "052",
+    "delivered": 2011,
+    "seats": 516,
+    "note": "Leased to Hi Fly as 9H-AIY, the first A380 to fly for a charter operator"
+  },
+  {
+    "reg": "F-HPJF",
+    "hex": "39bd25",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "064",
+    "delivered": 2011,
+    "seats": 516,
+    "note": "Withdrawn from use and scrapped at Teruel"
+  },
+  {
+    "reg": "F-HPJG",
+    "hex": "39bd26",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "067",
+    "delivered": 2012,
+    "seats": 516,
+    "note": "Withdrawn from use and scrapped at Teruel"
+  },
+  {
+    "reg": "F-HPJH",
+    "hex": "39bd27",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "099",
+    "delivered": null,
+    "seats": 516,
+    "note": null
+  },
+  {
+    "reg": "F-HPJI",
+    "hex": "39bd28",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "115",
+    "delivered": 2013,
+    "seats": 516,
+    "note": "Wore Air France's 80th anniversary retro livery, 2013-2014"
+  },
+  {
+    "reg": "F-HPJJ",
+    "hex": "39bd29",
+    "operatorIcao": "AFR",
+    "operator": "Air France",
+    "msn": "117",
+    "delivered": 2014,
+    "seats": 516,
+    "note": "Withdrawn from use and being parted out at Tarbes"
+  },
+  {
+    "reg": "JA381A",
+    "hex": "852a24",
+    "operatorIcao": "ANA",
+    "operator": "All Nippon Airways",
+    "msn": null,
+    "delivered": 2019,
+    "seats": 520,
+    "note": "FLYING HONU 'Lani' - the blue sea-turtle livery, ANA's first A380"
+  },
+  {
+    "reg": "JA382A",
+    "hex": "852a46",
+    "operatorIcao": "ANA",
+    "operator": "All Nippon Airways",
+    "msn": null,
+    "delivered": 2019,
+    "seats": 520,
+    "note": "FLYING HONU 'Kai' - the emerald-green sea-turtle livery"
+  },
+  {
+    "reg": "JA383A",
+    "hex": "852a68",
+    "operatorIcao": "ANA",
+    "operator": "All Nippon Airways",
+    "msn": null,
+    "delivered": 2021,
+    "seats": 520,
+    "note": "FLYING HONU 'Ka La' - the orange sea-turtle livery, delivered 2021"
+  },
+  {
+    "reg": "9H-MIP",
+    "hex": "4d218e",
+    "operatorIcao": "HFY",
+    "operator": "Hi Fly",
+    "msn": "006",
+    "delivered": 2008,
+    "seats": 471,
+    "note": "Hi Fly's blue 'Save the Coral Reefs' livery for the Mirpuri Foundation"
+  },
+  {
+    "reg": "9H-GLOBL",
+    "hex": "4d252c",
+    "operatorIcao": "HFM",
+    "operator": "Global Airlines",
+    "msn": "120",
+    "delivered": 2013,
+    "seats": null,
+    "note": "Global Airlines' A380, ex-China Southern B-6140, flown by Hi Fly Malta"
+  }
+]

@@ -1,0 +1,40 @@
+{
+  "name": "Whale Watch LHR — live A380 tracker",
+  "short_name": "Whale Watch",
+  "description": "Every Airbus A380 arriving at and departing from London Heathrow, live. Countdowns, the active runway configuration, and the best place to stand.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#05070c",
+  "theme_color": "#05070c",
+  "lang": "en-GB",
+  "dir": "ltr",
+  "categories": ["travel", "utilities", "navigation"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Arrivals board",
+      "short_name": "Board",
+      "url": "/#board"
+    },
+    {
+      "name": "Live map",
+      "short_name": "Map",
+      "url": "/#map"
+    },
+    {
+      "name": "Spotting locations",
+      "short_name": "Spots",
+      "url": "/#spots"
+    }
+  ]
+}

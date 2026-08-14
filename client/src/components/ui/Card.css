@@ -1,0 +1,65 @@
+.ui-card {
+  position: relative;
+  display: block;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  /* Only ever animate compositor properties so a data refresh cannot shift layout. */
+  transition:
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.ui-card-item {
+  display: block;
+}
+
+.ui-card--accented {
+  padding-left: calc(var(--space-4) + 3px);
+}
+
+.ui-card--accented::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--ui-card-accent, var(--brand-cyan));
+}
+
+.ui-card--interactive {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ui-card--interactive:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-3);
+}
+
+.ui-card--interactive:active {
+  transform: scale(0.995);
+}
+
+.ui-card--interactive:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 2px;
+}
+
+@media (hover: none) {
+  .ui-card--interactive:hover {
+    border-color: var(--line);
+    background: var(--surface-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-card--interactive:active {
+    transform: none;
+  }
+}

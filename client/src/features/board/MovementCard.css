@@ -1,0 +1,253 @@
+/*
+ * MovementCard — dense, scannable, and immovable.
+ *
+ * Every value that ticks lives in a right-aligned column with a reserved width, and every row
+ * reserves its line height, so a refresh changes glyphs and nothing else.
+ */
+
+.mv {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.mv--selected {
+  border-color: var(--line-accent);
+  box-shadow: var(--glow-cyan);
+}
+
+/* ---- Identity ------------------------------------------------------------- */
+
+.mv-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mv-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mv-flightline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.mv-flight {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.mv-callsign {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mv-airline {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Countdown / phase ----------------------------------------------------- */
+
+.mv-status {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  /* Reserved so "9 min" and "1 h 05" occupy the same column. */
+  min-width: 7ch;
+  text-align: right;
+}
+
+.mv-countdown {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: 1.15;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.mv--arrival .mv-countdown {
+  color: var(--arrival);
+}
+
+.mv--departure .mv-countdown {
+  color: var(--departure);
+}
+
+.mv-eta {
+  font-size: var(--text-2xs);
+  line-height: 1.2;
+  color: var(--text-muted);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+}
+
+/* ---- Route ----------------------------------------------------------------- */
+
+.mv-route {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+
+.mv-route-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.mv--arrival .mv-route-icon {
+  color: var(--arrival);
+}
+
+.mv--departure .mv-route-icon {
+  color: var(--departure);
+}
+
+.mv-route-text {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mv-place {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mv-arrow {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.mv-route--unknown {
+  color: var(--text-muted);
+}
+
+/* ---- Airframe --------------------------------------------------------------- */
+
+.mv-frame {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.mv-reg {
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text);
+}
+
+.mv-reg--unknown {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  letter-spacing: normal;
+  color: var(--text-muted);
+}
+
+/* ---- Telemetry --------------------------------------------------------------- */
+
+.mv-telem {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.mv-telem-item {
+  min-width: 0;
+}
+
+.mv-telem dt {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mv-telem dd {
+  margin: 0;
+  /* The line box is reserved so a value becoming a dash cannot shorten the row. */
+  min-height: 1.4em;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.4;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Footer ------------------------------------------------------------------ */
+
+.mv-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mv-vertical {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* ---- Wider screens ------------------------------------------------------------ */
+
+@media (min-width: 560px) {
+  .mv-flight {
+    font-size: var(--text-xl);
+  }
+
+  .mv-countdown {
+    font-size: var(--text-xl);
+  }
+
+  .mv-telem {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+
+  .mv-telem dd {
+    font-size: var(--text-base);
+  }
+}

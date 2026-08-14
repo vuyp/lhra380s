@@ -1,0 +1,317 @@
+/*
+ * NextWhale — the hero panel.
+ *
+ * Reads like a flight-deck instrument: one luminous number, a rail underneath it, and a row of
+ * supporting values that never move. The airline colour arrives on the wire and is used only as
+ * a wash and an edge, never as text, so contrast stays under our control.
+ */
+
+.next {
+  --next-accent: var(--arrival);
+
+  position: relative;
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in srgb, var(--next-accent) 16%, transparent) 0%,
+      transparent 58%
+    ),
+    var(--surface-2);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.next::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 4px;
+  background: var(--next-accent);
+}
+
+/* ---- Header ------------------------------------------------------------------ */
+
+.next-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.next-eyebrow {
+  /* .app-eyebrow supplies the type; this only stops the h2 default weight fighting it. */
+  font-weight: var(--weight-semibold);
+}
+
+/* ---- Identity and countdown ---------------------------------------------------- */
+
+.next-main {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.next-ident {
+  min-width: 0;
+}
+
+.next-flight {
+  min-width: 0;
+}
+
+.next-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap-target);
+  max-width: 100%;
+  padding-inline-end: var(--space-1);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+  text-align: start;
+}
+
+.next-open-chevron {
+  flex: none;
+  color: var(--text-muted);
+  transition: transform var(--dur) var(--ease);
+}
+
+.next-open:hover .next-open-chevron {
+  transform: translateX(2px);
+  color: var(--text-secondary);
+}
+
+.next-airline {
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+}
+
+.next-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+
+.next-reg {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+}
+
+.next-dot {
+  color: var(--text-muted);
+}
+
+.next-route {
+  color: var(--text-secondary);
+}
+
+.next-note {
+  margin-top: var(--space-3);
+}
+
+.next-count {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.next-count-label {
+  color: var(--text-muted);
+}
+
+.next-value {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  line-height: 1.02;
+  letter-spacing: var(--tracking-tight);
+  color: var(--arrival);
+  /* Reserve the line box so a value collapsing to a dash cannot shorten the hero. */
+  min-height: 1.02em;
+  white-space: nowrap;
+}
+
+.next-count-sub {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  min-height: 1.4em;
+}
+
+/* ---- Approach rail --------------------------------------------------------------- */
+
+.next-track {
+  display: grid;
+  gap: var(--space-2);
+  /* Fixed box so losing the position for one frame does not resize the hero. */
+  min-height: 40px;
+  align-content: center;
+}
+
+.next-track-rail {
+  position: relative;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--text-muted) 26%, transparent);
+  overflow: visible;
+}
+
+.next-track-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--arrival) 40%, transparent),
+    var(--arrival)
+  );
+  transition: inline-size var(--dur-slow) var(--ease);
+}
+
+.next-track-mark {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin-inline-start: -6px;
+  border: 2px solid var(--surface-2);
+  border-radius: var(--radius-full);
+  background: var(--arrival);
+  transform: translateY(-50%);
+  transition: inset-inline-start var(--dur-slow) var(--ease);
+}
+
+.next-track-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.next-track-end {
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+}
+
+.next-track-void {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---- Facts -------------------------------------------------------------------------- */
+
+.next-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+/* ---- Stale ---------------------------------------------------------------------------- */
+
+.next-warn {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.next-warn-text {
+  flex: 1 1 16ch;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* ---- Idle ------------------------------------------------------------------------------ */
+
+.next--idle {
+  --next-accent: var(--text-muted);
+
+  background: var(--surface-1);
+  box-shadow: none;
+}
+
+.next-idle-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.next-idle-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.next-idle-title {
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-tight);
+}
+
+.next-idle-message {
+  max-width: 54ch;
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* ---- Larger screens ---------------------------------------------------------------------- */
+
+@media (min-width: 560px) {
+  .next {
+    padding: var(--space-6) var(--space-5) var(--space-5);
+  }
+
+  .next-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-5);
+  }
+
+  .next-count {
+    align-items: flex-end;
+    text-align: end;
+  }
+
+  .next-open {
+    font-size: var(--text-2xl);
+  }
+
+  .next-facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .next-track-fill,
+  .next-track-mark,
+  .next-open-chevron {
+    transition: none;
+  }
+}

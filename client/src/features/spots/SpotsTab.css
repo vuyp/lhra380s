@@ -1,0 +1,212 @@
+/*
+ * SpotsTab layout.
+ *
+ * One column on a phone, two once there is room for them. The header carries the reason the
+ * order is what it is, so it is styled as a panel rather than a heading floating in space.
+ */
+
+.spots {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* ---- Why this order ---------------------------------------------------------------- */
+
+.spots-head {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+}
+
+.spots-config {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+  /* Two lines of headline are reserved so a config change cannot shove the list down. */
+  min-height: calc(var(--text-lg) * 2 * 1.2);
+}
+
+.spots-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.spots-meta {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.spots-note {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.spots-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--warning) 38%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.spots-warn .ui-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+/* ---- Controls ------------------------------------------------------------------------ */
+
+.spots-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.spots-locate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--line-accent);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--brand-cyan) 12%, transparent);
+  color: var(--brand-cyan);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.spots-locate:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand-cyan) 22%, transparent);
+  border-color: var(--brand-cyan);
+}
+
+.spots-locate:disabled {
+  border-color: var(--line);
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.spots-geo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.spots-geo--on .ui-icon {
+  color: var(--brand-cyan);
+}
+
+.spots-geo-note {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.spots-geo-note:empty {
+  display: none;
+}
+
+/* ---- List ------------------------------------------------------------------------------ */
+
+.spots-list {
+  display: grid;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.spots-skeleton {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.spots-updated {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+}
+
+/* ---- Etiquette --------------------------------------------------------------------------- */
+
+.spots-etiquette {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+}
+
+.spots-etiquette-title {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.spots-etiquette-list {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.spots-etiquette-list li {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.spots-etiquette-list li::before {
+  content: '';
+  flex: none;
+  width: 4px;
+  height: 4px;
+  margin-top: 0.55em;
+  border-radius: var(--radius-full);
+  background: var(--text-muted);
+}
+
+/* ---- Wider screens ------------------------------------------------------------------------- */
+
+@media (min-width: 720px) {
+  .spots-config {
+    font-size: var(--text-xl);
+    min-height: 0;
+  }
+}
+
+@media (min-width: 900px) {
+  .spots {
+    gap: var(--space-6);
+  }
+
+  /* Two columns of cards; the header, controls and footer stay full width. */
+  .spots-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-4);
+  }
+}

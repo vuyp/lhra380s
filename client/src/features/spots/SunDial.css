@@ -1,0 +1,194 @@
+/*
+ * SunDial — the sun instrument inside an expanded spot card.
+ *
+ * Strokes are kept at or above one viewBox unit so the dial still reads at 120 px, and every
+ * colour comes from a token so it survives the light theme without a second palette.
+ */
+
+.sun {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+}
+
+.sun-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.sun-caption {
+  min-width: 0;
+}
+
+.sun-headline {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.sun-detail {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ---- The instrument -------------------------------------------------------- */
+
+.sun-dial {
+  flex: none;
+  overflow: visible;
+}
+
+.sun-ring {
+  fill: none;
+}
+
+.sun-ring--horizon {
+  stroke: var(--line-strong);
+  stroke-width: 1.4;
+}
+
+.sun-ring--minor {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 2 3.5;
+}
+
+.sun-zenith {
+  fill: var(--text-muted);
+}
+
+.sun-cone-stop-in {
+  stop-color: var(--brand-cyan);
+  stop-opacity: 0.3;
+}
+
+.sun-cone-stop-out {
+  stop-color: var(--brand-cyan);
+  stop-opacity: 0.04;
+}
+
+.sun-cone-edge {
+  fill: none;
+  stroke: var(--brand-cyan);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.55;
+}
+
+.sun-axis,
+.sun-axis-head {
+  fill: none;
+  stroke: var(--brand-cyan);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.sun-north {
+  fill: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-wide);
+}
+
+.sun-offset-arc {
+  fill: none;
+  stroke: var(--brand-amber);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.sun-glow-stop-in {
+  stop-color: var(--brand-amber);
+  stop-opacity: 0.42;
+}
+
+.sun-glow-stop-out {
+  stop-color: var(--brand-amber);
+  stop-opacity: 0;
+}
+
+.sun-disc {
+  fill: var(--brand-amber);
+  stroke: none;
+}
+
+.sun-ray {
+  fill: none;
+  stroke: var(--brand-amber);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.sun-disc--below {
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.6;
+  stroke-dasharray: 2.5 2.5;
+}
+
+/* Night: the sky rings recede so the one honest fact — the sun is gone — reads first. */
+.sun-dial--night .sun-ring--horizon {
+  stroke: var(--line);
+}
+
+.sun-dial--night .sun-cone-stop-in {
+  stop-opacity: 0.14;
+}
+
+.sun-dial--night .sun-axis,
+.sun-dial--night .sun-axis-head,
+.sun-dial--night .sun-cone-edge {
+  opacity: 0.5;
+}
+
+.sun-dial--empty {
+  opacity: 0.55;
+}
+
+/* ---- Readout ---------------------------------------------------------------- */
+
+.sun-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.sun-fact {
+  min-width: 0;
+}
+
+.sun-fact dt {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sun-fact dd {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+/* ---- Narrow phones ----------------------------------------------------------- */
+
+@media (max-width: 359px) {
+  .sun-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

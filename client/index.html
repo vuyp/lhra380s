@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <title>Whale Watch LHR — live A380 tracker for Heathrow</title>
+    <meta
+      name="description"
+      content="Every Airbus A380 arriving at and departing from London Heathrow, live. Countdowns, the active runway configuration, and the best place to stand — free, no account, no ads."
+    />
+    <meta name="application-name" content="Whale Watch LHR" />
+    <meta name="apple-mobile-web-app-title" content="Whale Watch" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#f4f6fa" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#05070c" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Whale Watch LHR" />
+    <meta property="og:title" content="Whale Watch LHR — live A380 tracker for Heathrow" />
+    <meta
+      property="og:description"
+      content="Every A380 into and out of Heathrow, live. Countdowns, the active runway config, and where to stand."
+    />
+    <meta property="og:image" content="/icon.svg" />
+    <meta name="twitter:card" content="summary" />
+
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <script>
+      /* Apply the saved theme before first paint so the app never flashes the wrong scheme. */
+      (function () {
+        try {
+          var raw = localStorage.getItem('whalewatch.settings');
+          if (!raw) return;
+          var theme = JSON.parse(raw).theme;
+          if (theme === 'dark' || theme === 'light') {
+            document.documentElement.setAttribute('data-theme', theme);
+          }
+        } catch (_) {
+          /* Corrupt or blocked storage — fall back to the system scheme. */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      Whale Watch LHR needs JavaScript to stream live aircraft positions from Heathrow.
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

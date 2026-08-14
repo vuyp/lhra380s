@@ -1,0 +1,87 @@
+{
+  "UAE": {
+    "iata": "EK",
+    "name": "Emirates",
+    "color": "#D71921"
+  },
+  "BAW": {
+    "iata": "BA",
+    "name": "British Airways",
+    "color": "#075AAA"
+  },
+  "SIA": {
+    "iata": "SQ",
+    "name": "Singapore Airlines",
+    "color": "#1B3668"
+  },
+  "QFA": {
+    "iata": "QF",
+    "name": "Qantas",
+    "color": "#E40000"
+  },
+  "QTR": {
+    "iata": "QR",
+    "name": "Qatar Airways",
+    "color": "#5C0632"
+  },
+  "ETD": {
+    "iata": "EY",
+    "name": "Etihad Airways",
+    "color": "#8A6209"
+  },
+  "KAL": {
+    "iata": "KE",
+    "name": "Korean Air",
+    "color": "#00256C"
+  },
+  "AAR": {
+    "iata": "OZ",
+    "name": "Asiana Airlines",
+    "color": "#C4122E"
+  },
+  "DLH": {
+    "iata": "LH",
+    "name": "Lufthansa",
+    "color": "#05164D"
+  },
+  "MAS": {
+    "iata": "MH",
+    "name": "Malaysia Airlines",
+    "color": "#003D7C"
+  },
+  "THA": {
+    "iata": "TG",
+    "name": "Thai Airways International",
+    "color": "#57267F"
+  },
+  "CSN": {
+    "iata": "CZ",
+    "name": "China Southern Airlines",
+    "color": "#00458F"
+  },
+  "AFR": {
+    "iata": "AF",
+    "name": "Air France",
+    "color": "#002157"
+  },
+  "ANA": {
+    "iata": "NH",
+    "name": "All Nippon Airways",
+    "color": "#123A8C"
+  },
+  "HFY": {
+    "iata": "5K",
+    "name": "Hi Fly",
+    "color": "#0E3B5C"
+  },
+  "HFM": {
+    "iata": null,
+    "name": "Hi Fly Malta",
+    "color": "#0E3B5C"
+  },
+  "AIB": {
+    "iata": null,
+    "name": "Airbus",
+    "color": "#00205B"
+  }
+}

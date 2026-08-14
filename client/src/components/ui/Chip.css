@@ -1,0 +1,87 @@
+.ui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  border: 1px solid var(--ui-chip-line, var(--line-strong));
+  border-radius: var(--radius-full);
+  background: var(--ui-chip-bg, var(--surface-3));
+  color: var(--ui-chip-fg, var(--text-secondary));
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+}
+
+.ui-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-chip--sm {
+  padding: 2px var(--space-2);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.ui-chip--md {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.ui-chip--neutral {
+  --ui-chip-bg: color-mix(in srgb, var(--surface-3) 84%, transparent);
+  --ui-chip-fg: var(--text-secondary);
+  --ui-chip-line: var(--line);
+}
+
+.ui-chip--arrival {
+  --ui-chip-bg: color-mix(in srgb, var(--arrival) 14%, transparent);
+  --ui-chip-fg: var(--arrival);
+  --ui-chip-line: color-mix(in srgb, var(--arrival) 38%, transparent);
+}
+
+.ui-chip--departure {
+  --ui-chip-bg: color-mix(in srgb, var(--departure) 15%, transparent);
+  --ui-chip-fg: var(--departure);
+  --ui-chip-line: color-mix(in srgb, var(--departure) 40%, transparent);
+}
+
+.ui-chip--live {
+  --ui-chip-bg: color-mix(in srgb, var(--success) 15%, transparent);
+  --ui-chip-fg: var(--success);
+  --ui-chip-line: color-mix(in srgb, var(--success) 40%, transparent);
+}
+
+.ui-chip--warn {
+  --ui-chip-bg: color-mix(in srgb, var(--warning) 16%, transparent);
+  --ui-chip-fg: var(--warning);
+  --ui-chip-line: color-mix(in srgb, var(--warning) 42%, transparent);
+}
+
+.ui-chip-pulse {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  animation: ui-chip-pulse 2s var(--ease) infinite;
+}
+
+@keyframes ui-chip-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  70% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-chip-pulse {
+    animation: none;
+  }
+}

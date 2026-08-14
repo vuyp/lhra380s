@@ -1,0 +1,366 @@
+/*
+ * WorldFleet — a reference list that reads like a fleet register.
+ *
+ * The row grid is ident | telemetry, with the meta line spanning both underneath so a chip
+ * or a livery note never squeezes the numbers. Telemetry is right-aligned and tabular, which
+ * turns a column of altitudes into something you can scan rather than read.
+ */
+
+.world {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* ---- Headline ------------------------------------------------------------------------ */
+
+.world-lede {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.world-headline {
+  /* Reserve two lines at 390px so the sentence changing from 9 to 10 never nudges the list. */
+  min-height: 2.6em;
+  font-size: var(--text-md);
+  line-height: 1.3;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text-secondary);
+  text-wrap: balance;
+}
+
+.world-headline-count {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--brand-cyan);
+}
+
+.world-sub {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ---- Search --------------------------------------------------------------------------- */
+
+.world-search {
+  /* The label and the live match count are visually hidden, so this is effectively the field. */
+  display: grid;
+}
+
+.world-search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+  transition: border-color var(--dur) var(--ease);
+}
+
+.world-search-field:focus-within {
+  border-color: var(--line-accent);
+}
+
+.world-search-icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.world-input {
+  flex: 1;
+  min-width: 0;
+  /* The field itself owns the 44px target; the input fills it without adding a second border. */
+  align-self: stretch;
+  border: 0;
+  background: none;
+  font-size: var(--text-base);
+  color: var(--text);
+  outline: none;
+}
+
+.world-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* We supply our own clear button, so the platform's is redundant. */
+.world-input::-webkit-search-cancel-button,
+.world-input::-webkit-search-decoration {
+  appearance: none;
+}
+
+/*
+ * The hit area is a full 44px square even though the visible affordance is a 32px disc:
+ * the disc is drawn by ::before, so a cold thumb gets the whole target.
+ */
+.world-clear {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  margin-inline-end: calc(var(--space-2) * -1);
+  color: var(--text-secondary);
+  transition: color var(--dur) var(--ease);
+}
+
+.world-clear::before {
+  content: '';
+  position: absolute;
+  /* 44px target inset by 6px on each side leaves the 32px disc. */
+  inset: 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  transition: background-color var(--dur) var(--ease);
+}
+
+.world-clear > * {
+  position: relative;
+}
+
+.world-clear:hover {
+  color: var(--text);
+}
+
+.world-clear:hover::before {
+  background: var(--line-strong);
+}
+
+.world-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding-inline: var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  transition: background-color var(--dur) var(--ease);
+}
+
+.world-reset:hover {
+  background: var(--surface-3);
+}
+
+/* ---- Sections ------------------------------------------------------------------------- */
+
+.world-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.world-section + .world-section {
+  margin-block-start: var(--space-2);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--line);
+}
+
+/* Grounded airframes are context, not news — present but visually stepped back. */
+.world-section--ground {
+  opacity: 0.66;
+  transition: opacity var(--dur) var(--ease);
+}
+
+.world-section--ground:hover,
+.world-section--ground:focus-within {
+  opacity: 1;
+}
+
+.world-section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.world-section-note {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+}
+
+/* ---- Operator group -------------------------------------------------------------------- */
+
+.world-group {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.world-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.world-op {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.world-op--unknown {
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: var(--tracking-wide);
+}
+
+.world-op-count {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding-inline: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  font-size: var(--text-2xs);
+  letter-spacing: normal;
+  color: var(--text-secondary);
+}
+
+.world-rows {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* ---- Row ---------------------------------------------------------------------------------- */
+
+.world-row {
+  display: block;
+}
+
+.world-btn {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  text-align: start;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.world-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+
+.world-btn:active {
+  background: var(--surface-3);
+}
+
+.world-ident {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+
+/* The registration leads: it is the thing a spotter writes in the notebook. */
+.world-reg {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text);
+}
+
+.world-reg--unknown {
+  color: var(--text-muted);
+}
+
+.world-call {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.world-call--unknown {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.world-tele {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  justify-self: end;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.world-tele-alt {
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+}
+
+.world-tele-speed {
+  min-width: 4.5ch;
+  text-align: end;
+  color: var(--text-muted);
+}
+
+.world-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.world-note {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--brand-violet);
+}
+
+/* ---- Larger screens ----------------------------------------------------------------------- */
+
+@media (min-width: 720px) {
+  .world-headline {
+    min-height: 0;
+    font-size: var(--text-lg);
+  }
+
+  .world-headline-count {
+    font-size: var(--text-2xl);
+  }
+
+  .world-search-field {
+    max-width: 30rem;
+  }
+}
+
+@media (min-width: 900px) {
+  /* The register is a lookup table, not a chronology, so columns are safe here. */
+  .world-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .world-rows > .world-row,
+  .world-rows > .world-row > .world-btn {
+    height: 100%;
+  }
+}

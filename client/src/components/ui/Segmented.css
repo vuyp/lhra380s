@@ -1,0 +1,37 @@
+.ui-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+}
+
+.ui-seg-option {
+  flex: 1 1 auto;
+  min-height: calc(var(--tap-target) - 8px);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.ui-seg-option:hover {
+  color: var(--text);
+}
+
+.ui-seg-option--on {
+  background: var(--surface-3);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-seg-option:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: -1px;
+}

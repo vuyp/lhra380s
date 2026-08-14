@@ -1,0 +1,351 @@
+/*
+ * MovementLog — a timetable that reads like an instrument panel.
+ *
+ * The row grid is fixed: time | body | runway. The time and runway columns have hard widths
+ * so every row's numbers stack into clean vertical rules, and a row whose runway is unknown
+ * still occupies exactly the same space as one whose runway is known.
+ *
+ * Day headers stick beneath the shell's own sticky topbar, whose height it publishes as
+ * --app-topbar-height, and sit one layer below it so they slide under rather than over.
+ */
+
+.log {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* ---- Day ------------------------------------------------------------------------- */
+
+.log-day-group {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.log-day {
+  position: sticky;
+  top: var(--app-topbar-height, 0px);
+  z-index: calc(var(--z-sticky) - 1);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  /* The blurred bar reaches the gutters while the text stays on the content grid. */
+  margin-inline: calc(var(--space-4) * -1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  border-block-end: 1px solid var(--line);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.log-day-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-day-count {
+  flex: none;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-muted);
+}
+
+/* ---- Hour ------------------------------------------------------------------------- */
+
+.log-hour {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.log-hour + .log-hour {
+  margin-block-start: var(--space-4);
+}
+
+.log-hour-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--text-muted);
+}
+
+/* A hairline rule carries the eye from the hour label across the row block. */
+.log-hour-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.log-rows {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* ---- Row ---------------------------------------------------------------------------- */
+
+.log-row {
+  display: block;
+}
+
+.log-btn {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) 2.75rem;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-3);
+  padding-inline-start: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  text-align: start;
+  overflow: hidden;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+/* The airline accent: a hairline of the operator's brand colour, straight off the wire. */
+.log-btn::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--log-accent, var(--line-strong));
+}
+
+.log-btn:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+
+.log-btn:active {
+  background: var(--surface-3);
+}
+
+.log-time {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+
+.log-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.log-primary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: 1.35;
+}
+
+.log-glyph {
+  flex: none;
+}
+
+.log-glyph--arrival {
+  color: var(--arrival);
+}
+
+.log-glyph--departure {
+  color: var(--departure);
+}
+
+.log-flight {
+  flex: none;
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  letter-spacing: var(--tracking-tight);
+}
+
+.log-city {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+/* An unknown origin is stated, never dressed up as a city. */
+.log-city--unknown {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.log-secondary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+/* The registration is the spotter's souvenir — it gets the mono treatment and full contrast. */
+.log-reg {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-secondary);
+}
+
+.log-reg--unknown {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  letter-spacing: normal;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.log-op {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-ago {
+  margin-inline-start: auto;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.log-note {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--brand-violet);
+}
+
+.log-runway {
+  justify-self: end;
+  padding: 3px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.log-runway--unknown {
+  border-style: dashed;
+  background: none;
+  color: var(--text-muted);
+}
+
+/* ---- Load earlier ------------------------------------------------------------------- */
+
+.log-more {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  text-align: center;
+}
+
+.log-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding-inline: var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--text);
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.log-more-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: var(--line-accent);
+}
+
+.log-more-btn:disabled {
+  color: var(--text-muted);
+}
+
+.log-more-note {
+  max-width: 46ch;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.log-more-note--centred {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.log-error {
+  max-width: 52ch;
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--danger);
+  text-align: center;
+}
+
+/* ---- Larger screens ------------------------------------------------------------------ */
+
+@media (min-width: 720px) {
+  .log-day {
+    margin-inline: calc(var(--space-5) * -1);
+    padding-inline: var(--space-5);
+    font-size: var(--text-lg);
+  }
+
+  .log-btn {
+    grid-template-columns: 3.75rem minmax(0, 1fr) 3rem;
+    padding-block: var(--space-3);
+  }
+
+  .log-time {
+    font-size: var(--text-md);
+  }
+}
+
+@media (min-width: 900px) {
+  .log-day {
+    margin-inline: calc(var(--space-6) * -1);
+    padding-inline: var(--space-6);
+  }
+
+  /* The log stays one column at every width: it is a chronology, and reading it in two
+     snaking columns would scramble the order. Extra width goes to the route text instead. */
+  .log-btn {
+    grid-template-columns: 4rem minmax(0, 1fr) 3.5rem;
+    padding-inline: var(--space-5) var(--space-4);
+  }
+}
