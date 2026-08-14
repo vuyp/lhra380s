@@ -1,0 +1,190 @@
+/*
+ * Whale Watch LHR — design tokens.
+ *
+ * The single source of visual truth. Never hardcode a colour, radius, shadow or duration
+ * in a component; add a token here instead.
+ *
+ * The look: an aviation instrument at night. Deep ink surfaces, hairline borders, one
+ * luminous accent per meaning (cyan = arriving, amber = departing), generous type scale so
+ * it reads at arm's length on a windy perimeter road.
+ */
+
+:root {
+  color-scheme: dark light;
+
+  /* ---- Brand ------------------------------------------------------------ */
+  --brand-cyan: #37e0c8;
+  --brand-cyan-dim: #1fa895;
+  --brand-amber: #ffb547;
+  --brand-amber-dim: #c78320;
+  --brand-violet: #8b7cff;
+  --brand-coral: #ff6b6b;
+
+  /* ---- Semantic ---------------------------------------------------------- */
+  --arrival: var(--brand-cyan);
+  --departure: var(--brand-amber);
+  --danger: var(--brand-coral);
+  --success: #4ade80;
+  --warning: #fbbf24;
+
+  /* ---- Surfaces (dark, the default) -------------------------------------- */
+  --bg: #05070c;
+  --bg-gradient: radial-gradient(120% 100% at 50% 0%, #0d1320 0%, #05070c 62%);
+  --surface-1: #0b101a;
+  --surface-2: #111826;
+  --surface-3: #18202f;
+  --surface-glass: rgba(17, 24, 38, 0.72);
+  --overlay: rgba(3, 5, 9, 0.72);
+
+  /* ---- Lines ------------------------------------------------------------- */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --line-accent: rgba(55, 224, 200, 0.32);
+
+  /* ---- Text -------------------------------------------------------------- */
+  --text: #eaf0f7;
+  --text-secondary: #9aa8bd;
+  --text-muted: #64748b;
+  --text-inverse: #05070c;
+
+  /* ---- Type -------------------------------------------------------------- */
+  --font-sans: 'Inter var', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Roboto Mono', ui-monospace, 'Menlo', monospace;
+
+  --text-2xs: 0.6875rem; /* 11px — chips, labels only */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.8125rem;  /* 13px */
+  --text-base: 0.9375rem;/* 15px — minimum body size */
+  --text-md: 1.0625rem;  /* 17px */
+  --text-lg: 1.25rem;    /* 20px */
+  --text-xl: 1.625rem;   /* 26px */
+  --text-2xl: 2.25rem;   /* 36px */
+  --text-3xl: 3.25rem;   /* 52px — hero countdown */
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  --tracking-tight: -0.02em;
+  --tracking-wide: 0.04em;
+  --tracking-caps: 0.09em;
+
+  /* ---- Space (4px base) --------------------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* ---- Radii -------------------------------------------------------------- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-full: 999px;
+
+  /* ---- Elevation ---------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px -6px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 18px 48px -12px rgba(0, 0, 0, 0.7);
+  --glow-cyan: 0 0 0 1px rgba(55, 224, 200, 0.24), 0 8px 32px -8px rgba(55, 224, 200, 0.28);
+  --glow-amber: 0 0 0 1px rgba(255, 181, 71, 0.24), 0 8px 32px -8px rgba(255, 181, 71, 0.26);
+
+  /* ---- Motion ------------------------------------------------------------- */
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 320ms;
+
+  /* ---- Layout -------------------------------------------------------------- */
+  --max-width: 1240px;
+  --nav-height: 62px;
+  --header-height: 56px;
+  --tap-target: 44px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+
+  --z-map: 1;
+  --z-sticky: 20;
+  --z-nav: 40;
+  --z-sheet: 60;
+  --z-toast: 80;
+}
+
+/* Light theme — auto by system, overridable by [data-theme]. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f4f6fa;
+    --bg-gradient: radial-gradient(120% 100% at 50% 0%, #ffffff 0%, #eef1f7 60%);
+    --surface-1: #ffffff;
+    --surface-2: #f7f9fc;
+    --surface-3: #eef2f8;
+    --surface-glass: rgba(255, 255, 255, 0.82);
+    --overlay: rgba(240, 243, 248, 0.75);
+
+    --line: rgba(12, 20, 34, 0.1);
+    --line-strong: rgba(12, 20, 34, 0.18);
+    --line-accent: rgba(20, 150, 132, 0.34);
+
+    --text: #0c1422;
+    --text-secondary: #4a5768;
+    --text-muted: #7c8798;
+    --text-inverse: #ffffff;
+
+    --brand-cyan: #0f9e8c;
+    --brand-cyan-dim: #0b7a6c;
+    --brand-amber: #b96f06;
+    --brand-amber-dim: #8f5504;
+    --brand-violet: #5b4bd6;
+    --brand-coral: #d64545;
+    --success: #15803d;
+
+    --shadow-sm: 0 1px 2px rgba(12, 20, 34, 0.08);
+    --shadow-md: 0 6px 20px -8px rgba(12, 20, 34, 0.18);
+    --shadow-lg: 0 18px 48px -14px rgba(12, 20, 34, 0.24);
+    --glow-cyan: 0 0 0 1px rgba(15, 158, 140, 0.28), 0 8px 28px -10px rgba(15, 158, 140, 0.3);
+    --glow-amber: 0 0 0 1px rgba(185, 111, 6, 0.26), 0 8px 28px -10px rgba(185, 111, 6, 0.26);
+  }
+}
+
+:root[data-theme='light'] {
+  --bg: #f4f6fa;
+  --bg-gradient: radial-gradient(120% 100% at 50% 0%, #ffffff 0%, #eef1f7 60%);
+  --surface-1: #ffffff;
+  --surface-2: #f7f9fc;
+  --surface-3: #eef2f8;
+  --surface-glass: rgba(255, 255, 255, 0.82);
+  --overlay: rgba(240, 243, 248, 0.75);
+
+  --line: rgba(12, 20, 34, 0.1);
+  --line-strong: rgba(12, 20, 34, 0.18);
+  --line-accent: rgba(20, 150, 132, 0.34);
+
+  --text: #0c1422;
+  --text-secondary: #4a5768;
+  --text-muted: #7c8798;
+  --text-inverse: #ffffff;
+
+  --brand-cyan: #0f9e8c;
+  --brand-cyan-dim: #0b7a6c;
+  --brand-amber: #b96f06;
+  --brand-amber-dim: #8f5504;
+  --brand-violet: #5b4bd6;
+  --brand-coral: #d64545;
+  --success: #15803d;
+
+  --shadow-sm: 0 1px 2px rgba(12, 20, 34, 0.08);
+  --shadow-md: 0 6px 20px -8px rgba(12, 20, 34, 0.18);
+  --shadow-lg: 0 18px 48px -14px rgba(12, 20, 34, 0.24);
+  --glow-cyan: 0 0 0 1px rgba(15, 158, 140, 0.28), 0 8px 28px -10px rgba(15, 158, 140, 0.3);
+  --glow-amber: 0 0 0 1px rgba(185, 111, 6, 0.26), 0 8px 28px -10px rgba(185, 111, 6, 0.26);
+}
