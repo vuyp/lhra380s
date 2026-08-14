@@ -456,12 +456,6 @@ function toPlace(icao: string | null): Place | null {
   return { iata: null, icao, city: null, country: null, lat: null, lon: null };
 }
 
-/** Strip a trailing alpha suffix: "BAW117A" → "BAW117". */
-function stripAlphaSuffix(callsign: string): string | null {
-  const match = /^([A-Z]{2,3}\d{1,5})[A-Z]{1,2}$/.exec(callsign);
-  return match !== null && match[1] !== undefined ? match[1] : null;
-}
-
 /** Drop leading zeros in the numeric part: "BAW0117" → "BAW117". */
 function stripLeadingZeros(callsign: string): string | null {
   const match = /^([A-Z]{2,3})0+(\d+[A-Z]{0,2})$/.exec(callsign);
@@ -472,21 +466,26 @@ function stripLeadingZeros(callsign: string): string | null {
 }
 
 /**
- * Look up a curated LHR rotation. Exact callsign first, then the same callsign with a trailing
- * alpha suffix or leading zeros removed. Returns null when nothing matches — the caller marks the
- * route `unknown` rather than inferring a city.
+ * Look up a curated rotation. Exact callsign first, then the same callsign with leading zeros
+ * removed ("QTR004" → "QTR4"), which is the same flight written two ways.
+ *
+ * A trailing alpha suffix is deliberately **not** stripped. "BAW117A" really is BA117 flown a
+ * second time that day, but Emirates, Etihad, Qatar and British Airways all now file deliberately
+ * unrelated alphanumeric ATC callsigns — "UAE7V", "UAE1CL", "BAW3G" — and those have nothing to
+ * do with EK7, EK1 or BA3. Treating them as suffixed flight numbers put half the Emirates A380
+ * fleet on the Heathrow arrivals board while it was over the Aegean. A missed rotation costs an
+ * honest "origin unknown"; a wrong one is a lie.
+ *
+ * Returns null when nothing matches — the caller marks the route `unknown` rather than inferring
+ * a city.
  */
 export function lookupRoute(callsign: string | null): RouteInfo | null {
   const base = str(callsign)?.toUpperCase().replace(/\s+/g, '') ?? null;
   if (base === null) return null;
 
   const candidates: string[] = [base];
-  const withoutSuffix = stripAlphaSuffix(base);
-  if (withoutSuffix !== null) candidates.push(withoutSuffix);
-  for (const candidate of [...candidates]) {
-    const withoutZeros = stripLeadingZeros(candidate);
-    if (withoutZeros !== null) candidates.push(withoutZeros);
-  }
+  const withoutZeros = stripLeadingZeros(base);
+  if (withoutZeros !== null) candidates.push(withoutZeros);
 
   for (const candidate of candidates) {
     const row = ROUTES.get(candidate);
