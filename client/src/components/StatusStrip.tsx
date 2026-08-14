@@ -13,15 +13,18 @@ interface LightState {
 
 function describeLight(sun: {
   goldenHour: boolean;
+  goldenUntil: number | null;
   isDaylight: boolean;
   sunriseAt: number | null;
   sunsetAt: number | null;
 }): LightState {
   if (sun.goldenHour) {
-    const until = sun.isDaylight ? sun.sunsetAt : sun.sunriseAt;
+    // The server computes the elevation crossing that ends this golden hour. Reaching for sunset
+    // instead put "until 20:26" on a 05:45 golden hour every summer morning — thirteen hours out
+    // on the one number a photographer acts on.
     return {
       value: 'Golden hour',
-      sub: until === null ? 'Best light now' : `until ${formatClock(until)}`,
+      sub: sun.goldenUntil === null ? 'Best light now' : `until ${formatClock(sun.goldenUntil)}`,
     };
   }
   if (sun.isDaylight) {

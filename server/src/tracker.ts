@@ -44,6 +44,7 @@ import type {
   Movement,
   MovementKind,
   Place,
+  Provenance,
   RouteInfo,
   RunwayConfig,
   RunwayEnd,
@@ -99,6 +100,12 @@ const COASTING_AGE_SECONDS = 120;
 /** `worldwide` shows every A380 seen in this window. */
 const WORLDWIDE_WINDOW_MS = 15 * 60_000;
 
+/**
+ * The furthest back a movement-log query may reach. The store holds `movementLogMax` entries with
+ * no age limit, so this is a bound on the answer's size rather than on what is known.
+ */
+const MAX_MOVEMENT_QUERY_HOURS = 7 * 24;
+
 /** Beyond this an aircraft is not shown as an arrival, however well it lines up. */
 const INBOUND_MAX_NM = 2500;
 /** Bearing-to-LHR must be within this of the track for a flight to count as closing. */
@@ -112,8 +119,15 @@ const INBOUND_CONE_DEG = 55;
  * Lufthansa FRA–LAX/SFO and Qatar DOH–JFK all overfly southern England at cruise, pointing
  * straight at Heathrow for the better part of an hour. Past this radius the only thing that may
  * put an aircraft on the arrivals board is the curated timetable saying it is coming here.
+ *
+ * It is also bounded from the other side, by the descent test that replaced the old cruise veto.
+ * "Descending and closing on Heathrow" is true of every A380 landing at Paris, Amsterdam or
+ * Brussels, and the recording contains a Singapore A380 descending hard through FL300 while still
+ * 475 nm from Heathrow, bound for somewhere else entirely. Charles de Gaulle is 188 nm from
+ * Heathrow and Schiphol 200 nm, so the window has to stop short of them or their arrivals
+ * become ours.
  */
-const GEOMETRIC_INBOUND_MAX_NM = 180;
+const GEOMETRIC_INBOUND_MAX_NM = 175;
 
 /**
  * The descent profile an arrival has to be under, feet: the standard 3:1 slope with generous
@@ -123,26 +137,58 @@ const PROFILE_BASE_FT = 3000;
 const PROFILE_SLOPE_FT_PER_NM = 330;
 
 /**
- * Beyond top of descent, cruise altitude proves nothing either way, so an aircraft this far out
- * must show it is actually coming down before it counts as an arrival.
+ * How far above that slope an aircraft may still be claimed as an arrival, given it is coming
+ * down. A descent starting late is normal and the slope above is deliberately generous, but there
+ * is a point past which no vertical rate rescues the geometry: the recorded Lufthansa overflight
+ * crossed 18 nm from Heathrow at FL360, some 27 000 ft above the slope, and a single -300 fpm
+ * sample in the middle of that must never be enough to put it on the board.
  */
-const CRUISE_AMBIGUOUS_NM = 100;
-const CRUISE_CEILING_FT = 29_000;
+const PROFILE_SLACK_FT = 12_000;
+
+/**
+ * Inside this range an arrival has unambiguously left cruise: nothing landing at Heathrow is
+ * still in the flight levels at 60 nm, so altitude alone separates an arrival from an overflight
+ * and the corridor may be opened up to swallow radar vectors and base legs.
+ */
+const TERMINAL_NM = 60;
+
+/**
+ * A descent is *observed* when the aircraft has come down this far from the highest level it has
+ * been seen at in this session.
+ *
+ * This is the relative test the absolute one could not do. An A380 that cruises at FL430 and
+ * steps down to FL330 is plainly descending, but a fixed 29 000 ft ceiling calls it "still at
+ * cruise", and a vertical rate sampled between step-downs reads zero. Watching each airframe
+ * against its own cruise level catches both.
+ */
+const DESCENT_FROM_CRUISE_FT = 2_500;
 const DESCENT_FPM = -250;
+
+/**
+ * Ground speed decay, knots below the aircraft's own observed cruise speed, that corroborates an
+ * arrival. Overflights hold 470–520 kt across the whole crossing; arrivals wash off speed as they
+ * come down. Corroboration only — it is never sufficient on its own.
+ */
+const SPEED_DECAY_KTS = 45;
 
 /**
  * How far the aircraft's own track may pass from the airport before "pointing this way" stops
  * meaning "coming here".
  *
  * An arrival is not aimed at the field: it is aimed at whichever of the four stacks it has been
- * given — Bovingdon, Lambourne, Ockham or Biggin, all of them 17 to 22 nm out — so the floor has
- * to clear that comfortably or every genuine arrival is thrown away. Beyond that it scales with
- * range, and it only applies to the geometric case; a timetabled rotation is not second-guessed
- * on its routing.
+ * given — Bovingdon, Lambourne, Ockham or Biggin, all of them 17 to 22 nm out — and further out it
+ * is on an airway that misses Heathrow by more than that. The recorded Emirates arrival in
+ * server/test/replay.test.ts held a 38 nm offset from 180 nm all the way in to 80 nm, and only then
+ * turned; its offset collapsed to 7 nm in the four minutes that followed. A corridor tight enough
+ * to look decisive would have thrown that flight away for the whole hour it was worth showing.
+ *
+ * So this is a bound on "pointing this way", not a discriminator, and it is deliberately loose:
+ * the same recording has an overflight holding a 10 nm offset across the entire crossing, so a
+ * tight corridor would not have separated them anyway. The descent test does the real work.
  */
-const INBOUND_CORRIDOR_MIN_NM = 28;
-const INBOUND_CORRIDOR_MAX_NM = 60;
-const INBOUND_CORRIDOR_RATIO = 0.25;
+const INBOUND_CORRIDOR_MIN_NM = 40;
+const INBOUND_CORRIDOR_MAX_NM = 55;
+const INBOUND_CORRIDOR_RATIO = 0.35;
 
 /**
  * Arrivals are sticky. Radar vectors put an aircraft on a downwind leg heading away from the
@@ -172,6 +218,12 @@ const STATIONARY_KTS = 3;
 const TAKEOFF_ROLL_KTS = 60;
 /** No A380 lands and departs again inside this — it is a roll-out, not a take-off. */
 const TURNAROUND_MIN_MS = 10 * 60_000;
+/**
+ * A logged touchdown this recent, with no departure after it, still describes what an airframe
+ * found on the ground is doing: taxiing in. Long enough to cover a slow taxi to a remote stand,
+ * short enough that it can never speak for the next rotation.
+ */
+const RECENT_ARRIVAL_MS = 45 * 60_000;
 
 /** ETA smoothing (SPEC §5: the countdown must not jitter). */
 const ETA_ALPHA = 0.35;
@@ -270,6 +322,16 @@ const RUNWAY_LINES: RunwayLine[] = AIRPORT.runways.map((end) => {
 /** Half-width of the "on the centreline" corridor, nautical miles (~165 m). */
 const CENTRELINE_HALF_WIDTH_NM = 0.09;
 
+/**
+ * Tolerances for naming the runway a departure has just left the ground from. Wider than the
+ * ground-roll corridor because the first airborne fix is already drifting off the centreline, and
+ * extended past the far threshold because rotation happens near the end of the roll and the fix
+ * may land beyond it.
+ */
+const ROTATION_HALF_WIDTH_NM = 0.25;
+const ROTATION_BEHIND_NM = 0.25;
+const ROTATION_AHEAD_NM = 2;
+
 function insideAirport(position: LatLon | null): boolean {
   if (position === null) return false;
   if (AIRPORT.boundary.length >= 3) return pointInPolygon(position, AIRPORT.boundary);
@@ -287,6 +349,30 @@ function onRunwayCentreline(position: LatLon | null, track: number | null): bool
     return true;
   }
   return false;
+}
+
+/**
+ * Which runway the aircraft is physically over, in the direction it is travelling — the runway a
+ * departure has just rotated off.
+ *
+ * This is the only honest way to name a departure runway. The active configuration cannot do it:
+ * it describes the airport, not this aeroplane, and if the landing/departing assignment is
+ * unconfirmed or came from the METAR wind it is a guess. Nothing here is invented — when the
+ * geometry does not put the aircraft on a runway, the answer is "no runway".
+ */
+function runwayUnderAircraft(position: LatLon | null, track: number | null): RunwayPrediction {
+  if (position === null) return UNKNOWN_RUNWAY;
+  let best: { designator: string; cross: number } | null = null;
+  for (const line of RUNWAY_LINES) {
+    const cross = Math.abs(crossTrackNm(position, line.start, line.finish));
+    if (cross > ROTATION_HALF_WIDTH_NM) continue;
+    const along = alongTrackNm(position, line.start, line.finish);
+    if (along < -ROTATION_BEHIND_NM || along > line.lengthNm + ROTATION_AHEAD_NM) continue;
+    if (track === null || angularDelta(track, line.end.bearing) > APPROACH_ALIGN_DEG) continue;
+    if (best === null || cross < best.cross) best = { designator: line.end.designator, cross };
+  }
+  if (best === null) return UNKNOWN_RUNWAY;
+  return { runway: best.designator, source: 'observed', confidence: 0.9 };
 }
 
 /** True when the track lines up with any Heathrow runway direction. */
@@ -321,6 +407,16 @@ interface TrackedFlight {
   /** Smoothed change in distance per report; negative means closing. */
   distanceTrend: number | null;
   closing: boolean;
+
+  /**
+   * The highest altitude and ground speed this airframe has been seen at while airborne. An
+   * aircraft's own cruise is the only honest baseline for "has it started coming down / slowing
+   * up"; a fixed threshold mistakes a high cruise for a descent and a step-down for cruise.
+   */
+  cruiseAltitudeFt: number | null;
+  cruiseSpeedKts: number | null;
+  /** How well the evidence supports the arrival, once one has been asserted. */
+  arrivalGrade: ArrivalGrade;
 
   trail: TrailPoint[];
 
@@ -371,6 +467,14 @@ export type Tracker = {
   start(): void;
   stop(): void;
   snapshot(): Snapshot;
+  /**
+   * Completed movements from the last `hours` hours, newest first.
+   *
+   * Deliberately not a filter over `snapshot().log`: that list is capped at the snapshot window,
+   * so answering "the last 48 hours" from it would hand back 24 hours of rows and call them 48.
+   * The store keeps everything it has been told about, and this reads it directly.
+   */
+  movements(hours: number): LoggedMovement[];
   aircraftDetail(hex: string): AircraftDetail | null;
   spots(): SpotEvaluation[];
   subscribe(listener: (snapshot: Snapshot) => void): () => void;
@@ -380,11 +484,33 @@ export function createTracker(options?: { dataDir?: string }): Tracker {
   return new TrackerImpl(options?.dataDir);
 }
 
+/**
+ * Offline replay, for scoring the state machine against a recorded feed.
+ *
+ * The arrivals board cannot be developed against live traffic — the interesting events are an hour
+ * apart and never repeat — so a recording of the upstream A388 sweep is fed through *this exact
+ * state machine*, sample by sample, and the phase decisions are scored against what the aircraft
+ * turned out to do. Nothing here is a second implementation: `feed` is the same ingest path the
+ * poller uses, just with the network replaced by a file.
+ */
+export interface ReplayTracker {
+  /** Push one recorded sweep through the state machine and return the resulting snapshot. */
+  feed(list: UpstreamAircraft[], now: number): Snapshot;
+  /** The tracked phase for one airframe, or null when it is not being tracked. */
+  phaseOf(hex: string): FlightPhase | null;
+  /** How well the evidence currently supports the arrival — 'none' when it is not an arrival. */
+  gradeOf(hex: string): ArrivalGrade;
+}
+
+export function createReplayTracker(options?: { dataDir?: string }): ReplayTracker {
+  return new TrackerImpl(options?.dataDir);
+}
+
 /* ------------------------------------------------------------------ *
  * Implementation
  * ------------------------------------------------------------------ */
 
-class TrackerImpl implements Tracker {
+class TrackerImpl implements Tracker, ReplayTracker {
   private readonly store: MovementStore;
 
   private readonly flights = new Map<string, TrackedFlight>();
@@ -617,6 +743,9 @@ class TrackerImpl implements Tracker {
       bearingFromAirport: null,
       distanceTrend: null,
       closing: false,
+      cruiseAltitudeFt: null,
+      cruiseSpeedKts: null,
+      arrivalGrade: 'none',
       trail: [],
       phase: 'elsewhere',
       pendingPhase: null,
@@ -644,7 +773,17 @@ class TrackerImpl implements Tracker {
     return flight;
   }
 
-  private update(flight: TrackedFlight, ac: UpstreamAircraft, now: number): void {
+  private update(flight: TrackedFlight, raw: UpstreamAircraft, now: number): void {
+    // A frame that says nothing about the air/ground state does not get to change it. Upstream
+    // emits Mode-S-only frames (`{hex, seen}` and nothing else) for A380s several times an hour,
+    // and reading those as "airborne" turned a parked aeroplane into a departure and then an
+    // arrival, both of them written to the permanent log. The last observed state is carried
+    // forward instead, which is what coasting already does with position.
+    const ac: UpstreamAircraft =
+      raw.groundKnown || flight.lastOnGround === null
+        ? raw
+        : { ...raw, onGround: flight.lastOnGround };
+
     flight.lastSeenInFeed = now;
     flight.last = ac;
 
@@ -686,6 +825,17 @@ class TrackerImpl implements Tracker {
       this.appendTrail(flight, position, ac.altitude, receivedAt);
     }
 
+    // Each airframe's own cruise, the baseline the descent and deceleration tests measure against.
+    // Only sampled while airborne and well clear of the circuit, so a go-around cannot reset it.
+    if (!ac.onGround) {
+      if (ac.altitude !== null && (flight.cruiseAltitudeFt === null || ac.altitude > flight.cruiseAltitudeFt)) {
+        flight.cruiseAltitudeFt = ac.altitude;
+      }
+      if (ac.groundSpeed !== null && (flight.cruiseSpeedKts === null || ac.groundSpeed > flight.cruiseSpeedKts)) {
+        flight.cruiseSpeedKts = ac.groundSpeed;
+      }
+    }
+
     // Stationary bookkeeping, needed for the stand / taxi_out distinction.
     const groundSpeed = ac.groundSpeed;
     if (ac.onGround && (groundSpeed === null || groundSpeed < STATIONARY_KTS)) {
@@ -702,9 +852,14 @@ class TrackerImpl implements Tracker {
 
     this.updateEta(flight, ac, now);
 
-    if (!ac.onGround) {
+    // Only a frame that actually reported an altitude may rewrite what we know about the last
+    // airborne moment — a degraded frame carrying no altitude and no position would otherwise
+    // erase the fix the touchdown runway is named from.
+    if (!ac.onGround && raw.groundKnown) {
       flight.lastAirborneAltitude = ac.altitude;
-      flight.lastAirborneFix = { lat: ac.lat, lon: ac.lon, track: ac.track, altitude: ac.altitude };
+      if (ac.lat !== null && ac.lon !== null) {
+        flight.lastAirborneFix = { lat: ac.lat, lon: ac.lon, track: ac.track, altitude: ac.altitude };
+      }
     }
     flight.lastOnGround = ac.onGround;
     flight.lastGroundSpeed = ac.onGround ? ac.groundSpeed : null;
@@ -733,33 +888,54 @@ class TrackerImpl implements Tracker {
   private detectEvents(flight: TrackedFlight, ac: UpstreamAircraft, position: LatLon | null, now: number): void {
     const wasOnGround = flight.lastOnGround;
     if (wasOnGround === null) return;
+    if (wasOnGround === ac.onGround) return;
 
-    const inside = insideAirport(position ?? flight.position);
+    // A movement is a physical event, so it takes a position from *this* frame to claim one. The
+    // last known position is fine for describing where an aeroplane is; it is not evidence that
+    // anything happened, and combined with a degraded frame it invented whole flights.
+    if (position === null) return;
+
+    const inside = insideAirport(position);
     const distance = flight.distance;
 
-    if (!wasOnGround && ac.onGround && inside) {
+    if (ac.onGround) {
       const from = flight.lastAirborneAltitude;
-      if (from !== null && from > TOUCHDOWN_MAX_ALTITUDE_FT) return; // feed artefact, not a landing
-      this.logEvent(flight, 'arrival', now);
+      // Wheels-down inside the airport, from a height an aeroplane can land from. A transition
+      // with no airborne altitude behind it at all is a gap in the feed, not a touchdown.
+      if (!inside) return;
+      if (from === null || from > TOUCHDOWN_MAX_ALTITUDE_FT) return;
+      this.logEvent(flight, 'arrival', now, { position, track: ac.track });
       return;
     }
 
     if (
-      wasOnGround &&
-      !ac.onGround &&
       (inside || (distance !== null && distance <= WHEELS_UP_MAX_NM)) &&
-      (ac.groundSpeed === null || ac.groundSpeed >= WHEELS_UP_MIN_KTS)
+      (ac.groundSpeed === null || ac.groundSpeed >= WHEELS_UP_MIN_KTS) &&
+      // No A380 lands and departs again inside a turnaround: a wheels-up minutes after a logged
+      // touchdown, from an aeroplane that has not reached a stand, is the roll-out being reported
+      // ragged. `isTakeoffRoll` already refuses it for the phase; the log must refuse it too.
+      !withinTurnaround(flight, now)
     ) {
-      this.logEvent(flight, 'departure', now);
+      this.logEvent(flight, 'departure', now, { position, track: ac.track });
     }
   }
 
-  private logEvent(flight: TrackedFlight, kind: 'arrival' | 'departure', now: number): void {
+  private logEvent(
+    flight: TrackedFlight,
+    kind: 'arrival' | 'departure',
+    now: number,
+    at: { position: LatLon | null; track: number | null },
+  ): void {
     const previous = kind === 'arrival' ? flight.loggedArrivalAt : flight.loggedDepartureAt;
     if (previous !== null && now - previous < EVENT_DEBOUNCE_MS) return;
 
-    const runway = kind === 'arrival' ? this.arrivalRunwayAtTouchdown(flight) : predictDepartureRunway(this.runwayConfig);
-    flight.eventRunway = runway;
+    const runway =
+      kind === 'arrival'
+        ? this.arrivalRunwayAtTouchdown(flight)
+        : runwayUnderAircraft(at.position, at.track);
+    // A prediction with no runway in it is not a prediction; let the live view fall back to the
+    // configuration rather than pinning "TBC" to the movement for ever.
+    flight.eventRunway = runway.runway === null ? null : runway;
     flight.actualAt = now;
 
     if (kind === 'arrival') {
@@ -788,7 +964,10 @@ class TrackerImpl implements Tracker {
       registration: flight.registration,
       operator: flight.airline.name,
       operatorColor: flight.airline.color,
-      runway: runway.runway,
+      // The log is a record of what was seen. A runway the geometry did not actually show us —
+      // the active configuration's guess, say — is a prediction, and LoggedMovement carries no
+      // provenance for the UI to qualify it with, so it is left out rather than stated as fact.
+      runway: runway.source === 'observed' ? runway.runway : null,
       city,
     };
     this.store.append(entry);
@@ -805,6 +984,20 @@ class TrackerImpl implements Tracker {
     const fix = flight.lastAirborneFix;
     if (fix === null) return predictArrivalRunway({ lat: null, lon: null, track: null, altitude: null }, this.runwayConfig);
     return predictArrivalRunway(fix, this.runwayConfig);
+  }
+
+  /**
+   * Did this airframe land at Heathrow recently, with nothing logged since?
+   *
+   * Consulted only on first contact with an aeroplane already on the ground, where the phase
+   * machine itself knows nothing. The log holds the touchdown the poller watched happen, and a
+   * whale that landed twenty minutes ago and has not departed is on its way to a stand.
+   */
+  private arrivedRecently(hex: string, now: number): boolean {
+    const history = this.store.forAirframe(hex);
+    const latest = history[0]; // newest first: a departure since would be ahead of the arrival
+    if (latest === undefined || latest.kind !== 'arrival') return false;
+    return now - latest.at <= RECENT_ARRIVAL_MS;
   }
 
   /* ------------------------------ classification ------------------------------ */
@@ -826,13 +1019,21 @@ class TrackerImpl implements Tracker {
       }
 
       const stationaryFor = flight.stationarySince === null ? 0 : now - flight.stationarySince;
-      if (groundSpeed < STATIONARY_KTS && stationaryFor > STAND_AFTER_MS) return 'stand';
+      if (groundSpeed < STATIONARY_KTS && stationaryFor > STAND_AFTER_MS) {
+        // SPEC §5: the dwell is what makes it a stand, and only the observed dwell may set the
+        // flag that later licenses `taxi_out`. Ten seconds of stillness is a pause at a hold.
+        flight.hasBeenAtStand = true;
+        return 'stand';
+      }
       if (previous === 'stand' && groundSpeed < STATIONARY_KTS) return 'stand';
 
       if (flight.hasBeenAtStand) return 'taxi_out';
       if (previous === 'inbound' || previous === 'approach' || previous === 'landed') return 'landed';
       if (previous === 'departing' || previous === 'taxi_out') return 'taxi_out';
-      // First contact on the ground at Heathrow with no history to lean on.
+      // First contact on the ground at Heathrow: the phase machine has no history, but the
+      // movement log may — an airframe that landed here a few minutes ago and has not departed
+      // since is taxiing *in*, whatever it looks like from one frame.
+      if (this.arrivedRecently(flight.hex, now)) return 'landed';
       return groundSpeed < STATIONARY_KTS ? 'stand' : 'taxi_out';
     }
 
@@ -855,6 +1056,13 @@ class TrackerImpl implements Tracker {
 
     const wasArriving = previous === 'inbound' || previous === 'approach';
     const sticky = this.stillArriving(flight, distance);
+    const intent = this.arrivalIntent(flight, ac, where, distance);
+    // The grade is what the UI reports as confidence, so it tracks the live evidence rather than
+    // freezing at whatever the aircraft looked like when it first reached the board. A sticky
+    // arrival that is no longer producing evidence is honestly `likely`, not `confirmed`.
+    if (intent !== 'none') flight.arrivalGrade = intent;
+    else if (sticky || wasArriving) flight.arrivalGrade = 'likely';
+    else flight.arrivalGrade = 'none';
 
     // Inside 25 nm, below 6 000 ft, coming down and lined up with a Heathrow runway: there is
     // nowhere else this aircraft can be going. The one thing that has to be excluded is a
@@ -869,13 +1077,16 @@ class TrackerImpl implements Tracker {
       (descending || low) &&
       alignedWithRunway(track) &&
       this.routeAllowsArrival(flight) &&
-      (sticky || wasArriving || this.arrivalIntent(flight, ac, where, distance))
+      (sticky || wasArriving || intent !== 'none')
     ) {
+      // Wheels-down is minutes away and the aeroplane is low, slow and lined up: nothing about
+      // this is a guess any more.
+      flight.arrivalGrade = 'confirmed';
       return 'approach';
     }
 
     if (sticky) return 'inbound';
-    if (this.arrivalIntent(flight, ac, where, distance)) return 'inbound';
+    if (intent !== 'none') return 'inbound';
 
     if (flight.departedThisSession) return 'outbound';
     return 'elsewhere';
@@ -899,17 +1110,20 @@ class TrackerImpl implements Tracker {
     ac: UpstreamAircraft,
     where: LatLon,
     distance: number,
-  ): boolean {
-    if (flight.departedThisSession) return false;
-    if (!this.routeAllowsArrival(flight)) return false;
-    return looksLikeArrival({
+  ): ArrivalGrade {
+    if (flight.departedThisSession) return 'none';
+    if (!this.routeAllowsArrival(flight)) return 'none';
+    return assessArrival({
       position: where,
       distanceNm: distance,
       track: ac.track,
       altitudeFt: ac.altitude,
       verticalRateFpm: ac.verticalRate,
+      groundSpeedKts: ac.groundSpeed,
       closing: flight.closing,
       scheduledToAirport: routeAssertsArrival(flight),
+      cruiseAltitudeFt: flight.cruiseAltitudeFt,
+      cruiseSpeedKts: flight.cruiseSpeedKts,
     });
   }
 
@@ -978,10 +1192,10 @@ class TrackerImpl implements Tracker {
     flight.pendingPhase = null;
     flight.pendingCount = 0;
 
-    if (phase === 'stand') {
-      flight.hasBeenAtStand = true;
-      flight.standSince = now;
-    }
+    // `hasBeenAtStand` is deliberately NOT set here: reaching the `stand` phase is not the same
+    // as having served the three-minute dwell SPEC §5 defines, and only the dwell may license
+    // `taxi_out` afterwards. classify() sets it when it actually observes one.
+    if (phase === 'stand') flight.standSince = now;
     if (phase === 'climb_out' || phase === 'departing') {
       flight.hasBeenAtStand = false;
     }
@@ -1104,7 +1318,7 @@ class TrackerImpl implements Tracker {
       },
       distanceNm: flight.distance === null ? null : Math.round(flight.distance * 10) / 10,
       bearingFromAirport: flight.bearingFromAirport === null ? null : Math.round(flight.bearingFromAirport),
-      eta: this.etaFor(flight, kind),
+      eta: this.etaFor(flight, kind, now, coasting),
       runway: this.runwayFor(flight, kind),
       actualAt: flight.actualAt,
       firstSeen: flight.firstSeen,
@@ -1117,18 +1331,36 @@ class TrackerImpl implements Tracker {
   private routeFor(flight: TrackedFlight, kind: MovementKind): RouteInfo {
     const scheduled = flight.scheduledRoute;
     if (scheduled !== null) return scheduled;
-    if (kind === 'arrival' || flight.phase === 'landed') return ROUTE_TO_AIRPORT;
-    if (kind === 'departure' || flight.phase === 'taxi_out') return ROUTE_FROM_AIRPORT;
+    // An aeroplane on the tarmac has no known far end. It came from somewhere we did not watch it
+    // leave and is going somewhere nobody has told us about, so the honest answer is neither —
+    // "London → LHR" is not a route, it is the airport twice.
+    if (kind === 'ground') return UNKNOWN_ROUTE;
+    if (kind === 'arrival') return ROUTE_TO_AIRPORT;
+    if (kind === 'departure') return ROUTE_FROM_AIRPORT;
     return UNKNOWN_ROUTE;
   }
 
-  private etaFor(flight: TrackedFlight, kind: MovementKind): EtaInfo {
+  private etaFor(flight: TrackedFlight, kind: MovementKind, now: number, coasting: boolean): EtaInfo {
     if (kind === 'arrival') {
-      const minutes = flight.etaMinutes;
-      if (minutes === null || flight.etaAt === null) return UNKNOWN_ETA;
-      const rounded = Math.round(minutes);
+      // A held position cannot support a live countdown. The aeroplane stopped transmitting; the
+      // clock did not, and re-serving the last estimate every five seconds turns "5 min" into a
+      // number that has been wrong for a quarter of an hour.
+      if (coasting) return UNKNOWN_ETA;
+      const at = flight.etaAt;
+      if (flight.etaMinutes === null || at === null) return UNKNOWN_ETA;
+      // SPEC §5: recomputed against the clock every frame, never re-served frozen.
+      const rounded = Math.round((at - now) / 60_000);
       if (rounded < 0 || rounded > ETA_MAX_MIN) return UNKNOWN_ETA;
-      return { at: Math.round(flight.etaAt), minutes: rounded, source: 'observed' };
+      // How much this countdown is worth, and the honest answer differs across the board: a jet on
+      // final has an ETA good to a minute, one converging at cruise from 200 nm is on the board
+      // because the geometry says so and the number is a projection.
+      //   observed — the aeroplane's own position and speed, established on the approach
+      //   inferred — the same arithmetic, but the arrival itself is not yet confirmed
+      // 'schedule' is deliberately never used: no ETA in this app comes from a timetable. Every
+      // one of them is distance ÷ ground speed plus the SPEC pad, whether or not the callsign
+      // happens to match a curated rotation.
+      const source: Provenance = flight.arrivalGrade === 'confirmed' ? 'observed' : 'inferred';
+      return { at: Math.round(at), minutes: rounded, source };
     }
     if (flight.actualAt !== null) return { at: flight.actualAt, minutes: null, source: 'observed' };
     return UNKNOWN_ETA;
@@ -1177,6 +1409,25 @@ class TrackerImpl implements Tracker {
     }
   }
 
+  /* ------------------------------ replay surface ------------------------------ */
+
+  feed(list: UpstreamAircraft[], now: number): Snapshot {
+    if (list.length > 0) {
+      this.lastPollAt = now;
+      this.ingest(list, now);
+    }
+    this.rebuild(now);
+    return this.cached ?? emptySnapshot(now, this.runwayConfig, this.weather, this.sun(now), this.health(now));
+  }
+
+  phaseOf(hex: string): FlightPhase | null {
+    return this.flights.get(hex)?.phase ?? null;
+  }
+
+  gradeOf(hex: string): ArrivalGrade {
+    return this.flights.get(hex)?.arrivalGrade ?? 'none';
+  }
+
   /* ------------------------------ public surface ------------------------------ */
 
   snapshot(): Snapshot {
@@ -1188,6 +1439,11 @@ class TrackerImpl implements Tracker {
       return this.cached ?? emptySnapshot(now, this.runwayConfig, this.weather, this.sun(now), this.health(now));
     }
     return { ...cached, ts: now, health: this.health(now) };
+  }
+
+  movements(hours: number): LoggedMovement[] {
+    const span = Number.isFinite(hours) ? Math.min(MAX_MOVEMENT_QUERY_HOURS, Math.max(0, hours)) : 0;
+    return this.store.recent(span);
   }
 
   aircraftDetail(hex: string): AircraftDetail | null {
@@ -1242,8 +1498,21 @@ class TrackerImpl implements Tracker {
  * Pure helpers
  * ------------------------------------------------------------------ */
 
+/**
+ * The human flight number, when the callsign actually carries one.
+ *
+ * `UAE1` is Emirates flight EK1 and saying so is a translation, not a guess. `UAE70M` is not
+ * "EK70M": that flight does not exist and never has. Most A380 operators now transmit an
+ * operational callsign with an alphanumeric suffix that is deliberately *not* the flight number —
+ * two thirds of the airframes in a recorded sweep of the live A388 feed were of that shape — and
+ * mapping the designator across produces a plausible, searchable, wrong answer for every one of
+ * them. So a suffixed callsign has no derivable flight number and says so; the UI then shows the
+ * callsign that was actually transmitted, which is the true thing we know.
+ */
 function flightNumberFor(airline: Airline, number: string | null, callsign: string | null): string | null {
   if (number === null) return null;
+  // parseCallsign appends any operational suffix to the digits, so a non-digit means there was one.
+  if (!/^\d+$/.test(number)) return null;
   if (airline.iata !== null) return `${airline.iata}${number}`;
   if (airline.icao !== null) return `${airline.icao}${number}`;
   return callsign;
@@ -1273,14 +1542,20 @@ export interface RollEvidence {
   lastGroundSpeed: number | null;
 }
 
-export function isTakeoffRoll(flight: RollEvidence, groundSpeed: number, now: number): boolean {
-  if (
+/**
+ * True while an airframe is inside the turnaround that must follow its own logged touchdown: it
+ * has landed here, it has not reached a stand since, and no A380 is going anywhere in that time.
+ */
+export function withinTurnaround(flight: RollEvidence, now: number): boolean {
+  return (
     flight.loggedArrivalAt !== null &&
     !flight.hasBeenAtStand &&
     now - flight.loggedArrivalAt < TURNAROUND_MIN_MS
-  ) {
-    return false;
-  }
+  );
+}
+
+export function isTakeoffRoll(flight: RollEvidence, groundSpeed: number, now: number): boolean {
+  if (withinTurnaround(flight, now)) return false;
   // The previous report was airborne: this is the roll-out from a landing.
   if (flight.lastOnGround === false) return false;
   const previous = flight.lastGroundSpeed;
@@ -1294,6 +1569,15 @@ function isArrivalPhase(phase: FlightPhase): boolean {
   return phase === 'inbound' || phase === 'approach';
 }
 
+/**
+ * How well the evidence supports "this aircraft is coming to Heathrow".
+ *
+ * The board is the product, so the answer is graded rather than binary. A `likely` arrival is
+ * shown, and shown as unconfirmed — the honest reading of an aircraft that is converging on the
+ * field from range but has not yet done anything only an arrival does.
+ */
+export type ArrivalGrade = 'confirmed' | 'likely' | 'none';
+
 /** Everything the arrival test is allowed to look at. Exported so it can be tested honestly. */
 export interface ArrivalEvidence {
   position: LatLon;
@@ -1302,38 +1586,122 @@ export interface ArrivalEvidence {
   track: number | null;
   altitudeFt: number | null;
   verticalRateFpm: number | null;
+  groundSpeedKts: number | null;
   /** Distance to Heathrow has been decreasing. */
   closing: boolean;
   /** The curated timetable names EGLL as this callsign's destination. */
   scheduledToAirport: boolean;
+  /** Highest altitude this airframe has been seen at while airborne, feet. */
+  cruiseAltitudeFt: number | null;
+  /** Highest ground speed this airframe has been seen at while airborne, knots. */
+  cruiseSpeedKts: number | null;
 }
 
 /**
- * Is this aircraft on its way to Heathrow? Pure, and the whole of the false-positive defence.
+ * Is this aircraft on its way to Heathrow, and how sure are we? Pure, and the whole of the
+ * false-positive defence.
  *
  * The hard case is not the aeroplane over Singapore — that one fails on distance and heading
  * alone. It is the Emirates DXB–JFK, the Lufthansa FRA–LAX and the Qatar DOH–IAD, all of which
  * cross southern England at cruise, closing on Heathrow, pointing straight at it, for the better
- * part of an hour. Nothing about their geometry distinguishes them from an arrival. So they are
- * separated by the one thing that does differ: an arrival has started coming down, and past top
- * of descent geometry is not allowed to assert anything at all without the timetable agreeing.
+ * part of an hour. The single frame cannot tell them apart on altitude, because an arrival 140 nm
+ * out has not started down either.
+ *
+ * What does tell them apart, measured against a recorded feed, is *where the track goes*. An
+ * aircraft still en route to Heathrow is established on an arrival routing that passes within a
+ * few miles of the field. A transatlantic overflight is aimed at the oceanic entry points north
+ * west of London and misses Heathrow by tens of miles — while still pointing "at" it to within
+ * the 55° cone, because at 200 nm a 15° track error is only 12° of bearing.
+ *
+ * So the corridor does the work, and the descent is what promotes `likely` to `confirmed`.
  */
-export function looksLikeArrival(evidence: ArrivalEvidence): boolean {
+export function assessArrival(evidence: ArrivalEvidence): ArrivalGrade {
   const { distanceNm: distance, track } = evidence;
-  if (!Number.isFinite(distance) || distance > INBOUND_MAX_NM) return false;
-  if (!evidence.closing) return false;
-  if (track === null) return false;
-  if (angularDelta(track, bearing(evidence.position, AIRPORT_POSITION)) > INBOUND_CONE_DEG) return false;
+  if (!Number.isFinite(distance) || distance > INBOUND_MAX_NM) return 'none';
+  if (!evidence.closing) return 'none';
+  if (track === null) return 'none';
+  if (angularDelta(track, bearing(evidence.position, AIRPORT_POSITION)) > INBOUND_CONE_DEG) return 'none';
 
-  // The timetable is a published fact about the rotation, so it reaches as far as we track.
-  if (evidence.scheduledToAirport) return true;
+  const descending = isDescending(evidence);
+  // The 3:1 slope is a *veto*, not evidence. It is a real constraint inside 100 nm — an overflight
+  // at FL360 is above it from 100 nm in — and worthless beyond, where it allows FL370 and more.
+  const profileCeiling = PROFILE_BASE_FT + PROFILE_SLOPE_FT_PER_NM * distance;
+  const aboveProfile = evidence.altitudeFt !== null && evidence.altitudeFt > profileCeiling;
+  // Hopelessly high for this range: no descent claim can make this an arrival here.
+  const farAboveProfile = evidence.altitudeFt !== null && evidence.altitudeFt > profileCeiling + PROFILE_SLACK_FT;
 
-  if (distance > GEOMETRIC_INBOUND_MAX_NM) return false;
-  if (pathOffsetNm(evidence.position, track, distance) > corridorToleranceNm(distance)) return false;
-  return onArrivalProfile(distance, evidence.altitudeFt, evidence.verticalRateFpm);
+  // The timetable is a published fact about the rotation, so it reaches as far as we track. It is
+  // only `confirmed` once the aeroplane is close enough for its own behaviour to corroborate the
+  // schedule — a rotation that says Heathrow while still an ocean away is a plan, not an
+  // observation, however convincingly it happens to be pointing this way.
+  if (evidence.scheduledToAirport) {
+    const corroborated = distance <= GEOMETRIC_INBOUND_MAX_NM && (descending || distance <= TERMINAL_NM);
+    return corroborated ? 'confirmed' : 'likely';
+  }
+
+  if (distance > GEOMETRIC_INBOUND_MAX_NM) return 'none';
+  if (farAboveProfile) return 'none';
+  if (aboveProfile && !descending) return 'none';
+  if (pathOffsetNm(evidence.position, track, distance) > corridorToleranceNm(distance)) return 'none';
+
+  // Inside the terminal area, altitude is decisive on its own: nothing landing at Heathrow is
+  // still in the flight levels at 60 nm, and nothing overflying it is down at 8 000 ft. An
+  // aircraft transmitting no altitude at all cannot clear that bar, so it stays unconfirmed.
+  if (distance <= TERMINAL_NM) {
+    if (evidence.altitudeFt === null) return 'likely';
+    return aboveProfile ? 'likely' : 'confirmed';
+  }
+
+  // En route, the aircraft must be visibly coming down. This is the whole discriminator, and it is
+  // the one the recording supports: a Frankfurt–US A380 crossing 10 nm north of Heathrow at 100 nm
+  // holds FL360 to the coast without losing 100 ft, while a Heathrow arrival has left its cruise by
+  // 150 nm. Being aimed at the field proves nothing — the overflight is aimed at it too.
+  if (!descending) return 'none';
+  return isDecelerating(evidence) ? 'confirmed' : 'likely';
 }
 
-/** The curated timetable positively states that this callsign terminates at Heathrow. */
+/**
+ * Backwards-compatible boolean view of the arrival test: anything the tracker is willing to put
+ * on the board, at either grade.
+ */
+export function looksLikeArrival(evidence: ArrivalEvidence): boolean {
+  return assessArrival(evidence) !== 'none';
+}
+
+/**
+ * Has the aircraft left its cruise? True on an instantaneous vertical rate, and also when it has
+ * come down from the highest level it has been seen at — which catches the step-down descents
+ * where the rate reads zero between levels.
+ */
+function isDescending(evidence: ArrivalEvidence): boolean {
+  if (evidence.verticalRateFpm !== null && evidence.verticalRateFpm < DESCENT_FPM) return true;
+  const cruise = evidence.cruiseAltitudeFt;
+  const altitude = evidence.altitudeFt;
+  if (cruise === null || altitude === null) return false;
+  return cruise - altitude >= DESCENT_FROM_CRUISE_FT;
+}
+
+/** Has the aircraft washed off speed against its own observed cruise? */
+function isDecelerating(evidence: ArrivalEvidence): boolean {
+  const cruise = evidence.cruiseSpeedKts;
+  const speed = evidence.groundSpeedKts;
+  if (cruise === null || speed === null) return false;
+  return cruise - speed >= SPEED_DECAY_KTS;
+}
+
+/**
+ * The curated timetable positively states that this callsign terminates at Heathrow.
+ *
+ * Worth knowing how rarely this fires. Most A380 operators no longer transmit the flight number as
+ * their callsign: in a recorded sweep of the live A388 feed, 29 of 47 callsigns were operational
+ * ones with an alphanumeric suffix (UAE70M, ETD71M, UAE79Y, QTR65H…), and *none* of the aircraft
+ * observed arriving at, sitting on, or departing from Heathrow matched a curated rotation. The
+ * suffix cannot be stripped to recover the flight number either — UAE7V and UAE7TR would both
+ * collapse onto EK7, and two aeroplanes cannot be the same flight.
+ *
+ * So the timetable is a bonus, not the mechanism. The geometry and the descent have to carry the
+ * board on their own, which is what `assessArrival` is built to do.
+ */
 function routeAssertsArrival(flight: TrackedFlight): boolean {
   const icao = flight.scheduledRoute?.destination?.icao ?? null;
   return icao !== null && icao.toUpperCase() === AIRPORT.icao;
@@ -1349,27 +1717,26 @@ function pathOffsetNm(where: LatLon, track: number, distance: number): number {
   return Math.abs(crossTrackNm(AIRPORT_POSITION, where, ahead));
 }
 
+/**
+ * How far the aircraft's own track may pass from the airport, at this range.
+ *
+ * Tightening this with range is the obvious idea and the recording says it is wrong: a genuine
+ * Heathrow arrival still 140 nm out is established on an airway that misses the field by 40 nm and
+ * only turns towards it later, while the Frankfurt–US overflight that must be rejected is aimed
+ * within 10 nm of the field the whole way across. The corridor cannot separate them and must not
+ * pretend to; it is a sanity bound on "pointing this way", nothing more, and the descent test does
+ * the actual work.
+ */
 function corridorToleranceNm(distance: number): number {
   const scaled = distance * INBOUND_CORRIDOR_RATIO;
   return Math.min(INBOUND_CORRIDOR_MAX_NM, Math.max(INBOUND_CORRIDOR_MIN_NM, scaled));
-}
-
-/** Is the aircraft where one descending into Heathrow from this range would be? */
-function onArrivalProfile(distance: number, altitude: number | null, verticalRate: number | null): boolean {
-  if (distance > GEOMETRIC_INBOUND_MAX_NM) return false;
-  if (altitude !== null && altitude > PROFILE_BASE_FT + PROFILE_SLOPE_FT_PER_NM * distance) return false;
-  if (distance > CRUISE_AMBIGUOUS_NM) {
-    const descending = verticalRate !== null && verticalRate < DESCENT_FPM;
-    const belowCruise = altitude !== null && altitude <= CRUISE_CEILING_FT;
-    if (!descending && !belowCruise) return false;
-  }
-  return true;
 }
 
 /** Remember how close a confirmed arrival has come, so `stillArriving` can tell if it left. */
 function trackArrivalDistance(flight: TrackedFlight): void {
   if (!isArrivalPhase(flight.phase)) {
     flight.arrivalMinDistance = null;
+    flight.arrivalGrade = 'none';
     return;
   }
   const distance = flight.distance;

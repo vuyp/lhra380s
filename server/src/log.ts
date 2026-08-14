@@ -12,7 +12,7 @@
  * Diagnostics go to stdout, problems go to stderr, so a supervisor can route them separately.
  */
 
-import { CONFIG, type LogLevel } from './config.ts';
+import type { LogLevel } from './config.ts';
 
 export type { LogLevel };
 
@@ -30,7 +30,19 @@ const WEIGHT: Record<LogLevel, number> = {
 /** Beyond this a single argument is truncated — logs are for humans, not for dumps. */
 const MAX_ARG_CHARS = 2000;
 
-let currentLevel: LogLevel = CONFIG.logLevel;
+/**
+ * The level is read straight from the environment rather than from `CONFIG`, because config.ts
+ * logs while it is still being evaluated and importing it here at runtime would make that a
+ * circular import. config.ts calls `setLogLevel` with the parsed value as soon as it has one, so
+ * this bootstrap value is only ever used for records emitted during module initialisation.
+ */
+function levelFromEnv(): LogLevel {
+  const raw = process.env['LOG_LEVEL']?.trim().toLowerCase();
+  if (raw === 'debug' || raw === 'info' || raw === 'warn' || raw === 'error' || raw === 'silent') return raw;
+  return 'info';
+}
+
+let currentLevel: LogLevel = levelFromEnv();
 
 /** Move the threshold at runtime. Anything below it is dropped without being formatted. */
 export function setLogLevel(level: LogLevel): void {

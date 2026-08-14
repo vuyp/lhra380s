@@ -91,6 +91,7 @@ function IdleWhale(p: { snapshot: Snapshot; now: number }): ReactElement {
   const { snapshot, now } = p;
   const last = snapshot.log[0];
   const ground = snapshot.ground.length;
+  const airborne = snapshot.stats.airborneWorldwide;
 
   return (
     <article className="next next--idle">
@@ -98,19 +99,18 @@ function IdleWhale(p: { snapshot: Snapshot; now: number }): ReactElement {
         <span className="next-idle-icon" aria-hidden="true">
           <Icon name="binoculars" size={24} />
         </span>
-        <div>
+        <div className="next-idle-copy">
           <h2 className="next-idle-title">No whale inbound right now</h2>
           <p className="next-idle-message">
-            Whale Watch is following every A380 transmitting a position anywhere in the world —
-            {' '}
-            {snapshot.stats.airborneWorldwide} airborne at the moment — and this panel fills the
-            second one turns for Heathrow.
+            Nothing is turning for Heathrow this minute. This panel fills itself the moment one
+            does — there is no schedule behind it, only what the aircraft are transmitting.
           </p>
         </div>
       </div>
 
-      <div className="next-facts">
+      <div className="next-facts next-idle-facts">
         <Stat
+          wrap
           label="Last movement"
           value={
             last
@@ -126,18 +126,37 @@ function IdleWhale(p: { snapshot: Snapshot; now: number }): ReactElement {
           }
         />
         <Stat
+          wrap
           label="On the ground"
           value={ground}
           sub={ground === 0 ? 'no whales parked' : ground === 1 ? 'airframe at LHR' : 'airframes at LHR'}
         />
         <Stat
+          wrap
           label="Logged today"
           value={`${snapshot.stats.arrivalsToday} in · ${snapshot.stats.departuresToday} out`}
           sub={`${snapshot.stats.airframesToday} airframe${
             snapshot.stats.airframesToday === 1 ? '' : 's'
           } seen`}
         />
+        <Stat
+          wrap
+          label="Airborne now"
+          value={airborne}
+          sub={`A380${airborne === 1 ? '' : 's'} flying worldwide`}
+        />
       </div>
+
+      <nav className="next-idle-links" aria-label="While you wait">
+        <a className="next-idle-link" href="#spots">
+          <Icon name="binoculars" size={16} />
+          Find a spot for the current runways
+        </a>
+        <a className="next-idle-link" href="#fleet">
+          <Icon name="fleet" size={16} />
+          Browse today's log and the world fleet
+        </a>
+      </nav>
     </article>
   );
 }
@@ -180,13 +199,26 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
   return (
     <article className="next" style={accent}>
       <header className="next-head">
-        <h2 className="next-eyebrow app-eyebrow">Next whale into Heathrow</h2>
+        <h2 className="next-eyebrow app-eyebrow">
+          {down ? 'Just landed at Heathrow' : 'Next whale into Heathrow'}
+        </h2>
         <Chip tone={phaseTone(movement.phase)} size="sm">
           {phaseLabel(movement.phase)}
         </Chip>
       </header>
 
+      {/*
+        The countdown comes first in the source and first on a phone: it is the answer to the
+        only question this screen exists for. On a wide screen it moves to the right-hand
+        column, where the eye lands on it just as fast.
+      */}
       <div className="next-main">
+        <div className="next-count">
+          <p className="next-count-label app-eyebrow">{countdownLabel}</p>
+          <p className="next-value app-numeric">{countdown}</p>
+          <p className="next-count-sub app-numeric">{countdownSub}</p>
+        </div>
+
         <div className="next-ident">
           <p className="next-flight">
             <button
@@ -214,18 +246,8 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
             </span>
           </p>
           {movement.airframe.note ? (
-            <p className="next-note">
-              <Chip size="sm" tone="neutral" title={movement.airframe.note}>
-                {movement.airframe.note}
-              </Chip>
-            </p>
+            <p className="next-note">{movement.airframe.note}</p>
           ) : null}
-        </div>
-
-        <div className="next-count">
-          <p className="next-count-label app-eyebrow">{countdownLabel}</p>
-          <p className="next-value app-numeric">{countdown}</p>
-          <p className="next-count-sub app-numeric">{countdownSub}</p>
         </div>
       </div>
 
@@ -234,7 +256,10 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
       </p>
 
       <div className="next-track">
-        {progress ? (
+        {down ? (
+          // "3.2 nm to run" is not a true thing to say about an aeroplane that has landed.
+          <p className="next-track-void">On the ground at Heathrow — taxiing in</p>
+        ) : progress ? (
           <>
             <div
               className="next-track-rail"
@@ -268,8 +293,9 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
       </div>
 
       <div className="next-facts">
-        <Stat label="Runway" value={runway.label} sub={runway.short} />
+        <Stat wrap label="Runway" value={runway.label} sub={runway.short} />
         <Stat
+          wrap
           label="Distance"
           value={
             movement.distanceNm === null
@@ -283,6 +309,7 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
           }
         />
         <Stat
+          wrap
           label="Altitude"
           value={formatAltitude(telemetry.altitude, telemetry.onGround, settings.units)}
           sub={
@@ -292,6 +319,7 @@ export function NextWhale(p: { movement: Movement | null; snapshot: Snapshot; no
           }
         />
         <Stat
+          wrap
           label="Ground speed"
           value={formatSpeed(telemetry.groundSpeed, settings.units)}
           sub={

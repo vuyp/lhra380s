@@ -234,6 +234,38 @@ export function sunTimes(at: Date, lat: number, lon: number): { sunrise: number 
   };
 }
 
+/** Resolution of the search for the end of the golden hour, and how far ahead it looks. */
+const GOLDEN_STEP_MS = 4 * MS_PER_MINUTE;
+const GOLDEN_HORIZON_MS = 4 * 3_600_000;
+const GOLDEN_BISECTIONS = 5;
+
+function inGoldenBand(elevation: number): boolean {
+  return elevation >= GOLDEN_HOUR_MIN_ELEVATION && elevation <= GOLDEN_HOUR_MAX_ELEVATION;
+}
+
+/**
+ * When the golden hour in progress ends, or null when there is none (or it somehow outlasts the
+ * search horizon, which only happens inside the polar circles).
+ *
+ * The band is bounded by two elevations, so the honest answer is the next crossing of whichever
+ * edge the sun is heading for — the sun climbing out of the top of the band after dawn, or
+ * sinking through the bottom of it after dusk. Stepped forward, then bisected to about a minute.
+ */
+function goldenEndsAt(now: number, lat: number, lon: number): number | null {
+  for (let t = now + GOLDEN_STEP_MS; t <= now + GOLDEN_HORIZON_MS; t += GOLDEN_STEP_MS) {
+    if (inGoldenBand(sunPosition(new Date(t), lat, lon).elevation)) continue;
+    let lo = t - GOLDEN_STEP_MS;
+    let hi = t;
+    for (let i = 0; i < GOLDEN_BISECTIONS; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (inGoldenBand(sunPosition(new Date(mid), lat, lon).elevation)) lo = mid;
+      else hi = mid;
+    }
+    return Math.round(hi / MS_PER_MINUTE) * MS_PER_MINUTE;
+  }
+  return null;
+}
+
 /** Assemble the wire-contract SunInfo for a moment and a place. */
 export function sunInfo(now: number, lat: number, lon: number): SunInfo {
   const at = new Date(Number.isFinite(now) ? now : Date.now());
@@ -243,14 +275,15 @@ export function sunInfo(now: number, lat: number, lon: number): SunInfo {
   // Round first, then derive the flags from the rounded value, so the numbers the
   // UI prints and the badges it shows can never contradict each other.
   const reportedElevation = Math.round(elevation * 100) / 100;
+  const goldenHour = inGoldenBand(reportedElevation);
 
   return {
     azimuth: Math.round(azimuth * 100) / 100,
     elevation: reportedElevation,
     sunriseAt: sunrise,
     sunsetAt: sunset,
-    goldenHour:
-      reportedElevation >= GOLDEN_HOUR_MIN_ELEVATION && reportedElevation <= GOLDEN_HOUR_MAX_ELEVATION,
+    goldenHour,
+    goldenUntil: goldenHour ? goldenEndsAt(at.getTime(), lat, lon) : null,
     isDaylight: reportedElevation > HORIZON_ELEVATION_DEG,
   };
 }

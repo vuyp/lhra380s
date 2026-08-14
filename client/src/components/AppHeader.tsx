@@ -14,12 +14,22 @@ import './AppHeader.css';
 
 /* ---- Runway configuration --------------------------------------------------- */
 
-function runwayList(designators: string[] | undefined): string | null {
+function runwayList(designators: string[] | undefined, separator: string): string | null {
   if (!Array.isArray(designators)) return null;
   const cleaned = designators.filter(
     (value): value is string => typeof value === 'string' && value.trim().length > 0,
   );
-  return cleaned.length > 0 ? cleaned.join(' + ') : null;
+  return cleaned.length > 0 ? cleaned.join(separator) : null;
+}
+
+/**
+ * More than one runway in a role means the traffic did not tell us which of the pair is which.
+ * The server says as much in its summary; the header has to say it too, because "Landing 27L +
+ * 27R · Departing 27L + 27R" reads as both runways doing both jobs, which is never true.
+ */
+function isUnconfirmed(landing: string[] | undefined, departing: string[] | undefined): boolean {
+  const count = (list: string[] | undefined): number => (Array.isArray(list) ? list.length : 0);
+  return count(landing) > 1 || count(departing) > 1;
 }
 
 interface ConfidenceBadge {
@@ -28,8 +38,19 @@ interface ConfidenceBadge {
   title: string;
 }
 
-function confidenceBadge(confidence: number, sampleSize: number): ConfidenceBadge | null {
+function confidenceBadge(
+  confidence: number,
+  sampleSize: number,
+  unconfirmed: boolean,
+): ConfidenceBadge | null {
   const sample = `${sampleSize} aircraft observed`;
+  if (unconfirmed) {
+    return {
+      label: 'Unconfirmed',
+      tone: 'warn',
+      title: `The traffic did not separate the two runways — ${sample}`,
+    };
+  }
   if (!Number.isFinite(confidence) || confidence < 0.4) {
     return { label: 'Unconfirmed', tone: 'warn', title: `Low agreement — ${sample}` };
   }
@@ -54,9 +75,12 @@ function RunwayConfigLine(): ReactElement {
   }
 
   const config = snapshot.runwayConfig;
-  const landing = runwayList(config.landing);
-  const departing = runwayList(config.departing);
-  const badge = confidenceBadge(config.confidence, config.sampleSize);
+  const unconfirmed = isUnconfirmed(config.landing, config.departing);
+  // "27L or 27R" is the honest reading of an unseparated pair; "27L + 27R" claims both.
+  const separator = unconfirmed ? ' or ' : ' + ';
+  const landing = runwayList(config.landing, separator);
+  const departing = runwayList(config.departing, separator);
+  const badge = confidenceBadge(config.confidence, config.sampleSize, unconfirmed);
   const known = config.direction !== 'unknown' && (landing !== null || departing !== null);
 
   return (
@@ -67,8 +91,20 @@ function RunwayConfigLine(): ReactElement {
 
       {known ? (
         <p className="hdr-ops-text">
-          <span className="hdr-ops-direction">
-            {config.direction === 'westerly' ? 'Westerly ops' : 'Easterly ops'}
+          {/*
+            The confidence badge rides on the direction's own line. As a sibling of this block
+            it wrapped onto a line of its own, and appearing or disappearing with the traffic
+            pushed the entire page down 30px and back — the header must never do that.
+          */}
+          <span className="hdr-ops-lead">
+            <span className="hdr-ops-direction">
+              {config.direction === 'westerly' ? 'Westerly ops' : 'Easterly ops'}
+            </span>
+            {badge ? (
+              <Chip tone={badge.tone} size="sm" title={badge.title}>
+                {badge.label}
+              </Chip>
+            ) : null}
           </span>
           <span className="hdr-ops-pair hdr-ops-pair--land">
             <span className="hdr-ops-key">Landing</span>
@@ -81,16 +117,17 @@ function RunwayConfigLine(): ReactElement {
         </p>
       ) : (
         <p className="hdr-ops-text hdr-ops-text--unknown">
-          Runway configuration not yet derived
+          <span className="hdr-ops-lead">
+            Runway configuration not yet derived
+            {badge ? (
+              <Chip tone={badge.tone} size="sm" title={badge.title}>
+                {badge.label}
+              </Chip>
+            ) : null}
+          </span>
           <span className="hdr-ops-note">too little low traffic to be sure</span>
         </p>
       )}
-
-      {badge ? (
-        <Chip tone={badge.tone} size="sm" title={badge.title}>
-          {badge.label}
-        </Chip>
-      ) : null}
 
       <span className="app-visually-hidden">
         {config.summary || 'Active runway configuration is not yet known.'}
@@ -149,16 +186,34 @@ function WindLine(): ReactElement {
 
 type Connection =
   | { kind: 'live' }
+  | { kind: 'connecting'; detail: string }
   | { kind: 'delayed'; detail: string }
   | { kind: 'reconnecting'; detail: string }
   | { kind: 'offline'; detail: string };
 
+const BANNER_TITLE: Record<Exclude<Connection['kind'], 'live'>, string> = {
+  connecting: 'Connecting',
+  delayed: 'Feed delayed',
+  reconnecting: 'Reconnecting',
+  offline: 'Offline',
+};
+
 function ConnectionBanner(): ReactElement | null {
-  const { snapshot, connected, error, lastUpdate } = useSnapshot();
+  const { snapshot, connected, error, lastUpdate, fromCache, loading } = useSnapshot();
   const now = useNow(5000);
 
   let state: Connection;
-  if (connected && snapshot?.health.stale) {
+  if (fromCache && snapshot) {
+    // The service worker is answering, not the server. Saying "showing data from just now" here
+    // is the one thing an offline app must never do.
+    state = {
+      kind: 'offline',
+      detail:
+        lastUpdate === null
+          ? 'showing cached data — no connection to the Whale Watch server'
+          : `showing cached data from ${formatClock(lastUpdate)} — no connection to the server`,
+    };
+  } else if (connected && snapshot?.health.stale) {
     state = {
       kind: 'delayed',
       detail: `Heathrow feed has not refreshed since ${formatRelative(snapshot.health.lastPollAt, now)}`,
@@ -170,6 +225,9 @@ function ConnectionBanner(): ReactElement | null {
       kind: 'reconnecting',
       detail: `showing data from ${formatRelative(lastUpdate, now)}`,
     };
+  } else if (loading) {
+    // Nothing has failed yet — the very first request is simply still in flight.
+    state = { kind: 'connecting', detail: 'opening the live feed from Heathrow' };
   } else {
     state = { kind: 'offline', detail: error ?? 'no connection to the Whale Watch server' };
   }
@@ -180,29 +238,55 @@ function ConnectionBanner(): ReactElement | null {
     <div className={`hdr-banner hdr-banner--${state.kind}`} role="status" aria-live="polite">
       <Icon name={state.kind === 'offline' ? 'alert' : 'info'} size={16} />
       <p className="hdr-banner-text">
-        <strong>
-          {state.kind === 'delayed'
-            ? 'Feed delayed'
-            : state.kind === 'reconnecting'
-              ? 'Reconnecting'
-              : 'Offline'}
-        </strong>
+        <strong>{BANNER_TITLE[state.kind]}</strong>
         <span> — {state.detail}</span>
       </p>
     </div>
   );
 }
 
+/**
+ * Two different things can be wrong, and calling both of them "Stale" was a lie about one of
+ * them: this browser's stream can drop while the server's poll of Heathrow is perfectly current
+ * (data is fresh, we are reconnecting), and the stream can be fine while the upstream feed has
+ * gone quiet (connected, data is stale). Only the second is stale data.
+ */
 function LiveDot(): ReactElement {
-  const { snapshot, connected } = useSnapshot();
-  const healthy = connected && !snapshot?.health.stale;
+  const { snapshot, connected, fromCache, loading } = useSnapshot();
+
+  const state = ((): { className: string; text: string; title: string } => {
+    // Before the first snapshot lands there is nothing stale to report — we are simply connecting.
+    if (!snapshot && loading) {
+      return { className: 'hdr-dot--waiting', text: 'Linking', title: 'Opening the live feed' };
+    }
+    if (fromCache) {
+      return {
+        className: 'hdr-dot--down',
+        text: 'Offline',
+        title: 'Showing cached data — the Whale Watch server cannot be reached',
+      };
+    }
+    if (snapshot?.health.stale === true) {
+      return {
+        className: 'hdr-dot--down',
+        text: 'Stale',
+        title: 'The Heathrow feed has not refreshed — positions are being held',
+      };
+    }
+    if (!connected) {
+      return {
+        className: 'hdr-dot--waiting',
+        text: 'Reconnecting',
+        title: 'The live stream dropped — the data on screen is still the latest we received',
+      };
+    }
+    return { className: 'hdr-dot--live', text: 'Live', title: 'Streaming live' };
+  })();
+
   return (
-    <span
-      className={healthy ? 'hdr-dot hdr-dot--live' : 'hdr-dot hdr-dot--down'}
-      title={healthy ? 'Streaming live' : 'Not receiving live updates'}
-    >
+    <span className={`hdr-dot ${state.className}`} title={state.title}>
       <span className="hdr-dot-mark" aria-hidden="true" />
-      <span className="hdr-dot-text">{healthy ? 'Live' : 'Stale'}</span>
+      <span className="hdr-dot-text">{state.text}</span>
     </span>
   );
 }

@@ -193,8 +193,16 @@ export interface SunInfo {
   elevation: number;
   sunriseAt: number | null;
   sunsetAt: number | null;
-  /** True during the hour after sunrise / before sunset. */
+  /** True while the sun is low and warm: elevation between -4° and +8°. */
   goldenHour: boolean;
+  /**
+   * Epoch ms at which the current golden hour ends — the sun climbing past +8° in the morning or
+   * dropping below -4° in the evening. Null when there is no golden hour in progress.
+   *
+   * Computed from the elevation crossing itself, because sunrise and sunset are the wrong
+   * answers: a morning golden hour ends when the sun gets high, not thirteen hours later at dusk.
+   */
+  goldenUntil: number | null;
   isDaylight: boolean;
 }
 
@@ -205,10 +213,22 @@ export interface SpotLocation {
   tagline: string;
   lat: number;
   lon: number;
-  /** Runway ends this spot is good for, e.g. ["27L", "27R"]. */
-  goodFor: string[];
-  /** 'arrivals' | 'departures' | 'both'. */
-  sees: 'arrivals' | 'departures' | 'both';
+  /**
+   * Runway ends whose ARRIVALS can be watched from here, e.g. ["27L"].
+   *
+   * A spot's relationship to a runway depends on which end of it the spot stands at, so the two
+   * roles are listed separately: Myrtle Avenue is under the 27L approach and Stanwell Moor is
+   * under the 27L climb-out, and a single "good for 27L" list cannot tell them apart. Sending a
+   * spotter to the wrong end of the runway is the one mistake this app must never make.
+   */
+  arrivalsFor: string[];
+  /** Runway ends whose DEPARTURES — roll, rotation or climb-out — can be watched from here. */
+  departuresFor: string[];
+  /**
+   * How you get in. 'public' is a street, a verge or a free stand; 'airside' needs a boarding
+   * pass and is no use on a day you are not flying.
+   */
+  accessType: 'public' | 'airside';
   /** Compass bearing you look towards from this spot, degrees true. */
   viewBearing: number;
   /** Walking/transport directions. */

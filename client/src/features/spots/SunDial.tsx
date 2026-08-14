@@ -19,7 +19,12 @@ import './SunDial.css';
 
 type Light = SpotEvaluation['light'];
 
-/* Geometry, in viewBox units. The whole instrument lives in a 120 × 120 box. */
+/*
+ * Geometry, in viewBox units. The instrument is laid out in a 120 × 120 box, and the viewBox
+ * carries 8 units of margin around it so the outermost marks — the north label at radius 54,
+ * whichever way round the compass it lands — cannot be clipped by the edge.
+ */
+const VIEWBOX = '-8 -8 136 136';
 const CENTRE = 60;
 const HORIZON_R = 42;
 const BELOW_HORIZON_R = HORIZON_R + 8;
@@ -173,7 +178,7 @@ export function SunDial(p: {
       <div className="sun-top">
         <svg
           className={dialClasses.join(' ')}
-          viewBox="0 0 120 120"
+          viewBox={VIEWBOX}
           width={size}
           height={size}
           aria-hidden="true"

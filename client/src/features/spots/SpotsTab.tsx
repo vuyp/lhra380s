@@ -20,8 +20,9 @@ import { Skeleton } from '../../components/ui/Skeleton.tsx';
 import { compassPoint, formatRelative, formatSpeed } from '../../lib/format.ts';
 import { haversineKm, useGeolocation } from '../../lib/geo.ts';
 import type { GeolocationState } from '../../lib/geo.ts';
+import { useRouteDetail } from '../../state/route.ts';
 import { useSettings } from '../../state/settings.tsx';
-import { SpotCard } from './SpotCard.tsx';
+import { SpotCard, spotCardDomId } from './SpotCard.tsx';
 import './SpotsTab.css';
 
 type SortMode = 'best' | 'near';
@@ -289,6 +290,22 @@ export function SpotsTab(): ReactElement {
     if (sort !== 'near' || !position) return withDistance;
     return [...withDistance].sort((a, b) => proximityRank(b) - proximityRank(a));
   }, [evaluations, position, sort]);
+
+  /**
+   * Arriving from the map's "Open in Spots": the reader named a spot, so open that card and put
+   * it in front of them instead of dropping them at the top of an unfiltered list.
+   */
+  const focusSpotId = useRouteDetail('spots');
+  const focusedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (focusSpotId === null || evaluations === null) return;
+    if (focusedRef.current === focusSpotId) return;
+    if (!evaluations.some((evaluation) => evaluation.spot.id === focusSpotId)) return;
+    focusedRef.current = focusSpotId;
+    setOpen((previous) => new Set(previous).add(focusSpotId));
+    const card = document.getElementById(spotCardDomId(focusSpotId));
+    card?.scrollIntoView({ block: 'center', behavior: 'auto' });
+  }, [focusSpotId, evaluations]);
 
   const toggle = useCallback((id: string) => {
     setOpen((previous) => {

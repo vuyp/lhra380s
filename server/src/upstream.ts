@@ -11,8 +11,17 @@
  *    so a fast poller can never starve a slow one;
  *  - consecutive failures back off exponentially (2 s, 4 s, 8 s … capped at 60 s) per endpoint,
  *    and only one warning is logged per failed attempt — never per retry;
- *  - nothing is invented. Fields absent upstream stay `null`, and cached payloads returned while
- *    a request is rate-limited have their `ageSeconds` advanced by the real elapsed time.
+ *  - nothing is invented. Fields absent upstream stay `null`, values outside physical range are
+ *    dropped rather than clamped (a clamp is a guess), and the only payload ever replayed from
+ *    cache is one that is still inside the rate-limit window — with its `ageSeconds` advanced by
+ *    the real elapsed time.
+ *
+ * The distinction between "throttled" and "unavailable" is the load-bearing one. A throttled call
+ * made no request because the last one was seconds ago, so the cache is genuinely current and the
+ * caller may use it. An unavailable call means the endpoint is failing or in its backoff window:
+ * the caller gets nothing, so the tracker's health block goes stale and the UI can say so. Replaying
+ * cache through a backoff window is how a server ends up reporting a healthy feed for an upstream
+ * that has been dead for an hour.
  */
 
 import { setTimeout as delay } from 'node:timers/promises';
@@ -32,6 +41,16 @@ export type UpstreamAircraft = {
   /** Feet. Null when on the ground or not transmitted. */
   altitude: number | null;
   onGround: boolean;
+  /**
+   * Whether this frame actually said anything about the air/ground state.
+   *
+   * `alt_baro` carries both facts at once: the string "ground" means on the ground, a number means
+   * airborne, and *nothing at all* means neither — a Mode-S-only frame (`{hex, seen}`) is not an
+   * airborne aeroplane, it is an aeroplane we heard from without hearing an altitude. `onGround`
+   * is false in that case only because the field has to hold something; the caller must consult
+   * this flag before treating a change in `onGround` as a physical event.
+   */
+  groundKnown: boolean;
   /** Knots. */
   groundSpeed: number | null;
   /** Degrees true, 0–360. */
@@ -52,16 +71,53 @@ export type UpstreamAircraft = {
 let lastSuccessAt: number | null = null;
 let consecutiveFailures = 0;
 
-/** Module-level feed health, surfaced in `Snapshot.health`. */
-export function upstreamHealth(): { lastSuccessAt: number | null; failures: number } {
-  return { lastSuccessAt, failures: consecutiveFailures };
+export interface EndpointHealth {
+  label: string;
+  lastSuccessAt: number | null;
+  lastFailureAt: number | null;
+  /** Consecutive failures for this endpoint. */
+  failures: number;
+  /** Epoch ms before which this endpoint will not be retried; 0 when it is not backing off. */
+  nextAttemptAt: number;
+  /** Why the last attempt failed. Null once it has recovered. */
+  lastError: string | null;
+}
+
+export interface UpstreamHealth {
+  lastSuccessAt: number | null;
+  failures: number;
+  endpoints: EndpointHealth[];
+}
+
+/**
+ * Per-endpoint feed health. Exposed on /api/health so an outage can be diagnosed from outside
+ * the process — which endpoint, since when, with what error, and when it will be retried.
+ */
+export function upstreamHealth(): UpstreamHealth {
+  const list: EndpointHealth[] = [];
+  for (const state of endpoints.values()) {
+    list.push({
+      label: state.label,
+      lastSuccessAt: state.lastSuccessAt,
+      lastFailureAt: state.lastFailureAt,
+      failures: state.failures,
+      nextAttemptAt: state.nextAttemptAt,
+      lastError: state.lastError,
+    });
+  }
+  return { lastSuccessAt, failures: consecutiveFailures, endpoints: list };
 }
 
 interface EndpointState {
+  /** Human label, used in logs and in the health block. */
+  label: string;
   /** Consecutive failures for this endpoint — drives its backoff. */
   failures: number;
   /** Epoch ms before which this endpoint must not be retried. */
   nextAttemptAt: number;
+  lastSuccessAt: number | null;
+  lastFailureAt: number | null;
+  lastError: string | null;
 }
 
 interface HostSlot {
@@ -77,10 +133,29 @@ const MAX_HOST_WAITERS = 2;
 const endpoints = new Map<string, EndpointState>();
 const hosts = new Map<string, HostSlot>();
 
-function endpointState(url: string): EndpointState {
+/**
+ * Aborted when the process is shutting down. Without it a poll that is parked waiting for its
+ * rate-limit slot, or one waiting out a 12 s upstream timeout, keeps the event loop alive after
+ * every socket has been closed — the process then lingers until something kills it.
+ */
+const shutdownController = new AbortController();
+
+/** Abandon anything in flight. Called from the SIGTERM path; polling never resumes afterwards. */
+export function stopUpstream(): void {
+  if (!shutdownController.signal.aborted) shutdownController.abort();
+}
+
+function endpointState(url: string, label: string): EndpointState {
   const existing = endpoints.get(url);
   if (existing) return existing;
-  const created: EndpointState = { failures: 0, nextAttemptAt: 0 };
+  const created: EndpointState = {
+    label,
+    failures: 0,
+    nextAttemptAt: 0,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    lastError: null,
+  };
   endpoints.set(url, created);
   return created;
 }
@@ -119,7 +194,11 @@ async function acquireHostSlot(url: string): Promise<boolean> {
   slot.waiting += 1;
   try {
     const waitMs = scheduledAt - Date.now();
-    if (waitMs > 0) await delay(waitMs);
+    // `ref: false` so a parked poller cannot hold the process open on the way out; the HTTP server
+    // is what keeps this process alive, and once it is closed nothing here should.
+    if (waitMs > 0) await delay(waitMs, undefined, { ref: false, signal: shutdownController.signal });
+  } catch {
+    return false; // shutting down: skip this round entirely
   } finally {
     slot.waiting -= 1;
   }
@@ -149,20 +228,30 @@ function describeError(err: unknown): string {
 
 type FetchOutcome =
   | { status: 'ok'; body: unknown }
-  /** Rate-limited or backing off — no request was made, the caller should serve what it has. */
-  | { status: 'skipped' }
-  | { status: 'failed' };
+  /**
+   * No request was made because this host was contacted moments ago. Whatever we already hold is
+   * still current, so the caller may serve it.
+   */
+  | { status: 'throttled' }
+  /**
+   * The endpoint failed, or is inside the backoff window of a previous failure. The caller has
+   * nothing fresh and must say so — it may not dress up cached data as a successful poll.
+   */
+  | { status: 'unavailable' };
 
 async function requestJson(url: string, label: string): Promise<FetchOutcome> {
-  const state = endpointState(url);
-  if (Date.now() < state.nextAttemptAt) return { status: 'skipped' };
-  if (!(await acquireHostSlot(url))) return { status: 'skipped' };
+  const state = endpointState(url, label);
+  if (Date.now() < state.nextAttemptAt) return { status: 'unavailable' };
+  if (!(await acquireHostSlot(url))) return { status: 'throttled' };
   // The backoff may have been extended by a concurrent failure while we waited for the slot.
-  if (Date.now() < state.nextAttemptAt) return { status: 'skipped' };
+  if (Date.now() < state.nextAttemptAt) return { status: 'unavailable' };
+
+  if (shutdownController.signal.aborted) return { status: 'unavailable' };
 
   try {
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(CONFIG.upstream.timeoutMs),
+      // Whichever comes first: the per-request timeout, or the process going away.
+      signal: AbortSignal.any([AbortSignal.timeout(CONFIG.upstream.timeoutMs), shutdownController.signal]),
       redirect: 'follow',
       headers: {
         'user-agent': CONFIG.upstream.userAgent,
@@ -172,29 +261,52 @@ async function requestJson(url: string, label: string): Promise<FetchOutcome> {
     if (!response.ok) {
       // Drain the body so the socket can be reused.
       await response.text().catch(() => '');
-      return recordFailure(state, label, `HTTP ${response.status} ${response.statusText}`.trim());
+      return recordFailure(state, `HTTP ${response.status} ${response.statusText}`.trim());
     }
     const body: unknown = await response.json();
+    const now = Date.now();
     state.failures = 0;
     state.nextAttemptAt = 0;
+    state.lastSuccessAt = now;
+    state.lastError = null;
     consecutiveFailures = 0;
-    lastSuccessAt = Date.now();
+    lastSuccessAt = now;
     return { status: 'ok', body };
   } catch (err) {
-    return recordFailure(state, label, describeError(err));
+    // A request cut short because the process is going away is not an upstream failure, and
+    // recording it as one would leave a misleading last line in the log.
+    if (shutdownController.signal.aborted) return { status: 'unavailable' };
+    return recordFailure(state, describeError(err));
   }
 }
 
-function recordFailure(state: EndpointState, label: string, reason: string): FetchOutcome {
+/**
+ * A 200 whose body is not the feed we asked for is an outage wearing a success code. It gets the
+ * same backoff as a 500 — otherwise a permanently misbehaving endpoint is polled every five
+ * seconds for as long as the process lives, which is neither useful to us nor kind to a free
+ * public API.
+ */
+function recordPayloadFailure(url: string, reason: string): void {
+  const state = endpoints.get(url);
+  if (state === undefined) return;
+  recordFailure(state, reason);
+}
+
+function recordFailure(state: EndpointState, reason: string): FetchOutcome {
+  const now = Date.now();
   state.failures += 1;
   consecutiveFailures += 1;
   const wait = backoffMs(state.failures);
-  state.nextAttemptAt = Date.now() + wait;
+  state.nextAttemptAt = now + wait;
+  state.lastFailureAt = now;
+  state.lastError = reason;
   // One line per failed attempt. Backoff guarantees this cannot spam during an outage.
   log.warn(
-    `upstream ${label} failed (${state.failures} consecutive): ${reason} — retrying in ${Math.round(wait / 1000)}s`,
+    `upstream ${state.label} failed (${state.failures} consecutive): ${reason} — retrying in ${Math.round(
+      wait / 1000,
+    )}s`,
   );
-  return { status: 'failed' };
+  return { status: 'unavailable' };
 }
 
 /* ------------------------------------------------------------------ *
@@ -234,14 +346,54 @@ function normaliseDegrees(value: number | null): number | null {
   return Math.round(wrapped * 10) / 10;
 }
 
+/**
+ * A value outside its physical range is noise, not data: `gs: -1`, `lat: 999`, `alt_baro: 1e12`
+ * all turn up in the wild. They are dropped, never clamped — clamping -1 kt to 0 kt would put a
+ * moving aeroplane at a standstill on the board, which is a guess dressed as an observation.
+ */
+function bounded(value: number | null, min: number, max: number): number | null {
+  if (value === null) return null;
+  return value >= min && value <= max ? value : null;
+}
+
+/** Concorde cruised at 1 150 kt; an A380 does 560. Anything past this is a corrupt frame. */
+const MAX_GROUND_SPEED_KT = 1200;
+/** The lowest airfield on earth sits at −1 266 ft; the highest airliners reach FL450. */
+const MIN_ALTITUDE_FT = -2000;
+const MAX_ALTITUDE_FT = 70000;
+/** A fighter does 50 000 fpm; an airliner a tenth of that. */
+const MAX_VERTICAL_RATE_FPM = 30000;
+/** A position report older than a day tells us nothing except that the aircraft is gone. */
+const MAX_AGE_SECONDS = 86400;
+
+/**
+ * Roughly 250 A380s exist and about 12 000 aircraft are airborne worldwide at peak. Either feed
+ * returning more than this is broken or hostile, and every byte of it would be copied into every
+ * snapshot, every SSE frame and every open response. The ceiling costs nothing in normal
+ * operation and keeps one bad payload from taking the process with it.
+ */
+const MAX_AIRCRAFT_PER_PAYLOAD = 5000;
+
 function latitude(value: unknown): number | null {
-  const n = num(value);
-  return n !== null && n >= -90 && n <= 90 ? n : null;
+  return bounded(num(value), -90, 90);
 }
 
 function longitude(value: unknown): number | null {
-  const n = num(value);
-  return n !== null && n >= -180 && n <= 180 ? n : null;
+  return bounded(num(value), -180, 180);
+}
+
+/**
+ * Mode A squawk: four octal digits. adsb.lol sends it as a string, some feeders as a number —
+ * "0723" and 723 are the same code, and 12345 is not a code at all.
+ */
+function squawkCode(value: unknown): string | null {
+  let text: string | null = null;
+  if (typeof value === 'string') text = value.trim();
+  else if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 7777) {
+    text = String(value).padStart(4, '0');
+  }
+  if (text === null || !/^[0-7]{4}$/.test(text)) return null;
+  return text;
 }
 
 /** adsb.lol reports `now` in epoch ms; tolerate a seconds-based value defensively. */
@@ -265,10 +417,10 @@ function normaliseAircraft(raw: unknown, feedNowMs: number): UpstreamAircraft | 
   if (typeof altBaro === 'string' && altBaro.trim().toLowerCase() === 'ground') {
     onGround = true;
   } else {
-    altitude = num(altBaro);
+    altitude = bounded(num(altBaro), MIN_ALTITUDE_FT, MAX_ALTITUDE_FT);
     if (altitude === null) {
       // Some frames transmit only a geometric altitude; it is real data, not a guess.
-      altitude = num(raw['alt_geom']);
+      altitude = bounded(num(raw['alt_geom']), MIN_ALTITUDE_FT, MAX_ALTITUDE_FT);
     }
   }
   // A few feeders flag ground state on the geometric field instead.
@@ -277,8 +429,14 @@ function normaliseAircraft(raw: unknown, feedNowMs: number): UpstreamAircraft | 
     onGround = true;
     altitude = null;
   }
+  // "on the ground" is stated; "airborne" is only ever inferred from a usable altitude. Neither
+  // present means the frame said nothing about it at all.
+  const groundKnown = onGround || altitude !== null;
 
-  const ageSeconds = Math.max(0, num(raw['seen_pos']) ?? num(raw['seen']) ?? 0);
+  const rawAge = bounded(num(raw['seen_pos']) ?? num(raw['seen']), 0, MAX_AGE_SECONDS);
+  // An absent age is not "brand new" — but it is all we have, and the caller ages it forward from
+  // here, so 0 is the only starting point that does not invent staleness either way.
+  const ageSeconds = rawAge ?? 0;
 
   return {
     hex,
@@ -289,24 +447,39 @@ function normaliseAircraft(raw: unknown, feedNowMs: number): UpstreamAircraft | 
     lon: longitude(raw['lon']),
     altitude: onGround ? null : altitude,
     onGround,
-    groundSpeed: num(raw['gs']),
+    groundKnown,
+    groundSpeed: bounded(num(raw['gs']), 0, MAX_GROUND_SPEED_KT),
     track: normaliseDegrees(num(raw['track']) ?? num(raw['true_heading'])),
-    verticalRate: num(raw['baro_rate']) ?? num(raw['geom_rate']),
-    squawk: str(raw['squawk']),
+    verticalRate:
+      bounded(num(raw['baro_rate']), -MAX_VERTICAL_RATE_FPM, MAX_VERTICAL_RATE_FPM) ??
+      bounded(num(raw['geom_rate']), -MAX_VERTICAL_RATE_FPM, MAX_VERTICAL_RATE_FPM),
+    squawk: squawkCode(raw['squawk']),
     ageSeconds,
     receivedAt: Math.round(feedNowMs - ageSeconds * 1000),
   };
 }
 
-function parseAircraftPayload(body: unknown): UpstreamAircraft[] {
-  if (!isRecord(body)) return [];
+/**
+ * Returns null when the body is not an aircraft feed at all (a captive-portal page, an error
+ * envelope, `{}`), and an array — possibly empty — when it is. The difference matters: an empty
+ * feed is an answer, a body with no aircraft array is a broken endpoint that we should back off
+ * from rather than poll every five seconds forever.
+ */
+export function parseAircraftPayload(body: unknown): UpstreamAircraft[] | null {
+  if (!isRecord(body)) return null;
   const raw = body['ac'] ?? body['aircraft'];
-  if (!Array.isArray(raw)) return [];
+  if (!Array.isArray(raw)) return null;
   const feedNowMs = timestampMs(body['now']) ?? Date.now();
   const out: UpstreamAircraft[] = [];
   for (const item of raw) {
     const aircraft = normaliseAircraft(item, feedNowMs);
     if (aircraft !== null) out.push(aircraft);
+    if (out.length >= MAX_AIRCRAFT_PER_PAYLOAD) {
+      log.warn(
+        `upstream payload carried more than ${MAX_AIRCRAFT_PER_PAYLOAD} aircraft — ignoring the rest`,
+      );
+      break;
+    }
   }
   return out;
 }
@@ -322,11 +495,23 @@ interface AircraftCache {
 
 let a380Cache: AircraftCache | null = null;
 let areaCache: AircraftCache | null = null;
-let weatherCache: Weather | null = null;
 
-/** Replay a cached list with its ages advanced by the real elapsed time. */
-function replay(cache: AircraftCache): UpstreamAircraft[] {
-  const elapsed = Math.max(0, (Date.now() - cache.at) / 1000);
+/**
+ * A cached payload may only stand in for a live one while the rate limiter is the reason we did
+ * not ask again. Twice the minimum interval is the whole of that window, plus one poll of slack.
+ */
+function replayLimitMs(): number {
+  return Math.max(2 * CONFIG.upstream.minIntervalMs, CONFIG.poll.fleetMs) + 1_000;
+}
+
+/**
+ * Replay a cached list with its ages advanced by the real elapsed time, or null when the cache is
+ * too old to speak for the present.
+ */
+function replay(cache: AircraftCache | null): UpstreamAircraft[] | null {
+  if (cache === null) return null;
+  const elapsed = (Date.now() - cache.at) / 1000;
+  if (elapsed < 0 || elapsed * 1000 > replayLimitMs()) return null;
   if (elapsed === 0) return cache.data.map((ac) => ({ ...ac }));
   return cache.data.map((ac) => ({
     ...ac,
@@ -338,30 +523,44 @@ function replay(cache: AircraftCache): UpstreamAircraft[] {
  * Public API
  * ------------------------------------------------------------------ */
 
-/** Every A380 transmitting worldwide. adsb.lol `/v2/type/A388`. */
+/**
+ * Every A380 transmitting worldwide. adsb.lol `/v2/type/A388`.
+ *
+ * Returns an empty list when the feed is unavailable — the caller must treat that as "no data",
+ * not as "no aeroplanes", and mark the snapshot stale.
+ */
 export async function fetchA380s(): Promise<UpstreamAircraft[]> {
-  const outcome = await requestJson(CONFIG.upstream.a380Url, 'A388 fleet');
+  const url = CONFIG.upstream.a380Url;
+  const outcome = await requestJson(url, 'A388 fleet');
   if (outcome.status === 'ok') {
+    const parsed = parseAircraftPayload(outcome.body);
+    if (parsed === null) {
+      recordPayloadFailure(url, 'response carries no aircraft array');
+      return [];
+    }
     // The endpoint is already type-scoped; drop anything that positively contradicts it.
-    const list = parseAircraftPayload(outcome.body).filter(
-      (ac) => ac.type === null || ac.type === 'A388',
-    );
+    const list = parsed.filter((ac) => ac.type === null || ac.type === 'A388');
     a380Cache = { at: Date.now(), data: list };
     return list;
   }
-  if (outcome.status === 'skipped' && a380Cache !== null) return replay(a380Cache);
+  if (outcome.status === 'throttled') return replay(a380Cache) ?? [];
   return [];
 }
 
 /** All traffic within 60 nm of Heathrow, used to derive the live runway config. */
 export async function fetchAreaTraffic(): Promise<UpstreamAircraft[]> {
-  const outcome = await requestJson(CONFIG.upstream.areaUrl, 'LHR area traffic');
+  const url = CONFIG.upstream.areaUrl;
+  const outcome = await requestJson(url, 'LHR area traffic');
   if (outcome.status === 'ok') {
     const list = parseAircraftPayload(outcome.body);
+    if (list === null) {
+      recordPayloadFailure(url, 'response carries no aircraft array');
+      return [];
+    }
     areaCache = { at: Date.now(), data: list };
     return list;
   }
-  if (outcome.status === 'skipped' && areaCache !== null) return replay(areaCache);
+  if (outcome.status === 'throttled') return replay(areaCache) ?? [];
   return [];
 }
 
@@ -439,10 +638,15 @@ function observationTime(record: Record<string, unknown>): number | null {
   return null;
 }
 
-function parseMetar(body: unknown): Weather | null {
-  const list = Array.isArray(body) ? body : isRecord(body) && Array.isArray(body['data']) ? body['data'] : null;
-  if (list === null) return null;
+/** The observation list, or null when the body is not a METAR response at all. */
+function metarList(body: unknown): unknown[] | null {
+  if (Array.isArray(body)) return body;
+  if (isRecord(body) && Array.isArray(body['data'])) return body['data'];
+  return null;
+}
 
+/** Newest observation in the list, or null when the list holds nothing usable. */
+export function parseMetar(list: readonly unknown[]): Weather | null {
   let chosen: Record<string, unknown> | null = null;
   let chosenAt = -Infinity;
   for (const item of list) {
@@ -458,24 +662,35 @@ function parseMetar(body: unknown): Weather | null {
   return {
     raw: str(chosen['rawOb']),
     windDirection: windDirection(chosen['wdir']),
-    windSpeed: num(chosen['wspd']),
-    windGust: num(chosen['wgst']),
-    temperature: num(chosen['temp']),
+    // The strongest surface wind ever recorded is 231 kt; −80 °C is colder than Vostok.
+    windSpeed: bounded(num(chosen['wspd']), 0, 250),
+    windGust: bounded(num(chosen['wgst']), 0, 250),
+    temperature: bounded(num(chosen['temp']), -80, 60),
     visibility: visibility(chosen['visib']),
     cloudCover: upper(chosen['cover']) ?? cloudCoverFromLayers(chosen['clouds']),
     qnh: qnhHpa(chosen['altim']),
-    observedAt: Number.isFinite(chosenAt) ? chosenAt : null,
+    observedAt: chosenAt > 0 && Number.isFinite(chosenAt) ? chosenAt : null,
   };
 }
 
-/** Latest EGLL METAR. Returns null when unavailable — never throws. */
+/**
+ * Latest EGLL METAR, or null when it is unavailable — never throws.
+ *
+ * There is deliberately no cache here: a METAR carries its own `observedAt`, and the tracker keeps
+ * the last one it was given, so an outage leaves an observation that is visibly an hour old rather
+ * than a fresh-looking copy of it.
+ */
 export async function fetchWeather(): Promise<Weather | null> {
-  const outcome = await requestJson(CONFIG.upstream.weatherUrl, 'EGLL METAR');
-  if (outcome.status === 'ok') {
-    const parsed = parseMetar(outcome.body);
-    if (parsed !== null) weatherCache = parsed;
-    return parsed;
+  const url = CONFIG.upstream.weatherUrl;
+  const outcome = await requestJson(url, 'EGLL METAR');
+  if (outcome.status !== 'ok') return null;
+
+  const list = metarList(outcome.body);
+  if (list === null) {
+    recordPayloadFailure(url, 'response is not a METAR list');
+    return null;
   }
-  if (outcome.status === 'skipped' && weatherCache !== null) return { ...weatherCache };
-  return null;
+  // An empty list is a real answer: no current observation for EGLL. Nothing to report, nothing
+  // to back off from.
+  return parseMetar(list);
 }

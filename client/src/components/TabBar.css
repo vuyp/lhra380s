@@ -1,4 +1,10 @@
-/* Mobile: a fixed bottom bar sitting above the home indicator. */
+/*
+ * Mobile: a fixed bottom bar sitting above the home indicator.
+ *
+ * Opaque, not glassy: at 0.72 alpha the card text underneath read straight through the tab
+ * labels wherever the backdrop filter was unavailable or throttled. A short scrim above the
+ * bar fades content out before it reaches the edge, so the cut still reads as deliberate.
+ */
 .tab-bar {
   position: fixed;
   inset-inline: 0;
@@ -6,8 +12,17 @@
   z-index: var(--z-nav);
   padding-bottom: var(--safe-bottom);
   border-top: 1px solid var(--line);
-  background: var(--surface-glass);
-  backdrop-filter: blur(18px) saturate(140%);
+  background: var(--surface-sticky);
+}
+
+.tab-bar::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: var(--space-6);
+  pointer-events: none;
+  background: linear-gradient(to top, var(--bg), transparent);
 }
 
 .tab-list {
@@ -80,6 +95,10 @@
 
 /* Desktop / large tablet: a left rail that sticks under the header. */
 @media (min-width: 900px) {
+  .tab-bar::before {
+    display: none;
+  }
+
   .tab-bar {
     position: sticky;
     top: var(--app-topbar-height, var(--header-height));

@@ -2,6 +2,7 @@ import { Component, Suspense, lazy, useCallback, useEffect, useLayoutEffect, use
 import type { ReactElement, ReactNode } from 'react';
 import { SnapshotProvider, useSnapshot } from './api/useSnapshot.ts';
 import { useArrivalAlerts } from './lib/notifications.ts';
+import { parseHashRoute } from './state/route.ts';
 import { SelectionProvider } from './state/selection.tsx';
 import { SettingsProvider } from './state/settings.tsx';
 import { AppHeader } from './components/AppHeader.tsx';
@@ -25,8 +26,10 @@ const MapTab = lazy(() =>
 const DEFAULT_TAB: TabId = 'board';
 
 function parseHash(hash: string): TabId | null {
-  const value = hash.replace(/^#\/?/, '').trim().toLowerCase();
-  const match = TABS.find((tab) => tab.id === value);
+  // `#map/myrtle-avenue` is the map tab, focused on a spot: the tab is the first segment and the
+  // rest belongs to whichever view knows what to do with it (see state/route.ts).
+  const { tab } = parseHashRoute(hash);
+  const match = TABS.find((candidate) => candidate.id === tab);
   return match ? match.id : null;
 }
 
@@ -179,6 +182,17 @@ function AppShell(): ReactElement {
       document.documentElement.style.removeProperty('--app-topbar-height');
     };
   }, []);
+
+  // Switching tabs starts a new view at its beginning. Without this, jumping from a scrolled
+  // Spots list to Fleet drops you into the middle of the movement log.
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [active]);
 
   const activeTab = TABS.find((tab) => tab.id === active) ?? TABS[0];
   const showFirstLoad = loading && !snapshot;

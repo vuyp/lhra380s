@@ -25,6 +25,7 @@ import { useSelection } from '../../state/selection.tsx';
 import { useSettings } from '../../state/settings.tsx';
 import { Chip } from '../../components/ui/Chip.tsx';
 import { Icon } from '../../components/ui/Icon.tsx';
+import { collectTabbable } from '../../components/ui/Sheet.tsx';
 import { Skeleton } from '../../components/ui/Skeleton.tsx';
 import { Stat } from '../../components/ui/Stat.tsx';
 import {
@@ -33,6 +34,7 @@ import {
   formatClock,
   formatCountdown,
   formatDistance,
+  formatRelative,
   formatSpeed,
   phaseLabel,
   phaseTone,
@@ -49,9 +51,6 @@ import './AircraftSheet.css';
 
 const DASH = '—';
 const UNKNOWN = 'Not on file';
-
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Past this distance dragged, or this downward speed, the sheet goes. */
 const DISMISS_PX = 110;
@@ -138,12 +137,17 @@ function RouteBlock(p: { movement: Movement }): ReactElement {
     <section className="det-section">
       <SectionHead>Route</SectionHead>
       <div className="det-route">
+        {/*
+          Only an arrival's destination and a departure's origin are Heathrow by definition. A
+          movement on the ground is neither: forcing its far end to LHR rendered "LHR London →
+          LHR London Heathrow", which is the airport twice and a route never.
+        */}
         <RouteEnd place={route.origin} heathrow={kind === 'departure'} role="Origin" />
         <div className="det-route-link" aria-hidden="true">
           <span className="det-route-track" />
           <Icon name="plane" size={18} className="det-route-plane" />
         </div>
-        <RouteEnd place={route.destination} heathrow={kind !== 'departure'} role="Destination" />
+        <RouteEnd place={route.destination} heathrow={kind === 'arrival'} role="Destination" />
       </div>
       <p className="det-note">
         {sourceNote}
@@ -163,6 +167,24 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
   const stale = movement.coasting || age >= STALE_AFTER_SECONDS;
   const arriving = movement.kind === 'arrival';
 
+  /*
+   * A frame that is already down has no countdown, and printing "Off blocks in —" over the top
+   * of the panel says nothing. Report the event we actually watched happen instead.
+   */
+  const down = movement.phase === 'landed' || movement.phase === 'stand';
+  const downAt = movement.actualAt ?? movement.lastSeen;
+  const headline = down
+    ? {
+        label: movement.actualAt !== null ? 'Touched down' : 'Last seen',
+        value: formatClock(downAt),
+        sub: formatRelative(downAt, now),
+      }
+    : {
+        label: arriving ? 'Touchdown in' : 'Off blocks in',
+        value: formatCountdown(movement.eta.minutes),
+        sub: movement.eta.at === null ? 'ETA unavailable' : `~${formatClock(movement.eta.at)}`,
+      };
+
   return (
     <section className="det-section">
       <SectionHead>Live</SectionHead>
@@ -178,16 +200,18 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
 
       <div className="det-facts">
         <Stat
-          label={arriving ? 'Touchdown in' : 'Off blocks in'}
+          wrap
+          label={headline.label}
           value={
             <span aria-live="polite" className="det-live-eta">
-              {formatCountdown(movement.eta.minutes)}
+              {headline.value}
             </span>
           }
-          sub={movement.eta.at === null ? 'ETA unavailable' : `~${formatClock(movement.eta.at)}`}
+          sub={headline.sub}
         />
-        <Stat label="Runway" value={runway.label} sub={runway.short} />
+        <Stat wrap label="Runway" value={runway.label} sub={runway.short} />
         <Stat
+          wrap
           label="Altitude"
           value={formatAltitude(telemetry.altitude, telemetry.onGround, settings.units)}
           sub={
@@ -197,6 +221,7 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
           }
         />
         <Stat
+          wrap
           label="Ground speed"
           value={formatSpeed(telemetry.groundSpeed, settings.units)}
           sub={
@@ -206,6 +231,7 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
           }
         />
         <Stat
+          wrap
           label="Distance"
           value={
             movement.distanceNm === null ? DASH : formatDistance(movement.distanceNm, settings.units)
@@ -217,6 +243,7 @@ function LiveBlock(p: { movement: Movement; now: number }): ReactElement {
           }
         />
         <Stat
+          wrap
           label="Position fix"
           value={formatAge(age)}
           sub={telemetry.squawk ? `squawk ${telemetry.squawk}` : 'squawk unavailable'}
@@ -240,21 +267,25 @@ function GlobalBlock(p: { aircraft: GlobalAircraft }): ReactElement {
       </p>
       <div className="det-facts">
         <Stat
+          wrap
           label="Callsign"
           value={aircraft.callsign ?? 'Not transmitting'}
           sub={aircraft.operator ?? 'operator unknown'}
         />
         <Stat
+          wrap
           label="Altitude"
           value={formatAltitude(aircraft.altitude, aircraft.onGround, settings.units)}
           sub={aircraft.onGround ? 'on the ground' : 'barometric'}
         />
         <Stat
+          wrap
           label="Ground speed"
           value={formatSpeed(aircraft.groundSpeed, settings.units)}
           sub={aircraft.track === null ? 'track unavailable' : `tracking ${compassPoint(aircraft.track)}`}
         />
         <Stat
+          wrap
           label="Position"
           value={
             hasPosition
@@ -274,19 +305,22 @@ function AirframeBlock(p: { airframe: AircraftDetail['airframe'] }): ReactElemen
     <section className="det-section">
       <SectionHead>Airframe</SectionHead>
       <div className="det-facts">
-        <Stat label="Operator" value={airframe.operator ?? UNKNOWN} sub="fleet reference" />
+        <Stat wrap label="Operator" value={airframe.operator ?? UNKNOWN} sub="fleet reference" />
         <Stat
+          wrap
           label="Registration"
           value={airframe.registration ?? UNKNOWN}
           sub={`hex ${airframe.hex.toUpperCase()}`}
         />
-        <Stat label="MSN" value={airframe.msn ?? UNKNOWN} sub="serial number" />
+        <Stat wrap label="MSN" value={airframe.msn ?? UNKNOWN} sub="serial number" />
         <Stat
+          wrap
           label="Delivered"
           value={airframe.deliveredYear ?? UNKNOWN}
           sub={airframe.deliveredYear === null ? 'year unknown' : 'first flown / handed over'}
         />
         <Stat
+          wrap
           label="Seats"
           value={airframe.seats ?? UNKNOWN}
           sub={airframe.seats === null ? 'configuration unknown' : 'this operator’s layout'}
@@ -442,9 +476,9 @@ function DetailPanel(p: { hex: string; onClose: () => void; onShowMap: () => voi
 
     const panel = panelRef.current;
     if (!panel) return;
-    const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-      (element) => element.offsetParent !== null || element === document.activeElement,
-    );
+    // Shared with the settings sheet, tabbability filter and all: this panel has no roving
+    // tabindex in it today, and the trap must not depend on that staying true.
+    const items = collectTabbable(panel);
     const first = items[0];
     const last = items[items.length - 1];
     if (!first || !last) {

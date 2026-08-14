@@ -121,7 +121,13 @@
 }
 
 .next-note {
+  max-width: 46ch;
   margin-top: var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid color-mix(in srgb, var(--brand-violet) 60%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
 
 .next-count {
@@ -244,11 +250,21 @@
 
 /* ---- Idle ------------------------------------------------------------------------------ */
 
+/*
+ * The quiet board is the state most visitors meet, so it is composed rather than apologetic:
+ * a clear headline, four live numbers that prove the app is working, and two ways onward.
+ */
 .next--idle {
-  --next-accent: var(--text-muted);
+  --next-accent: var(--brand-cyan);
 
-  background: var(--surface-1);
-  box-shadow: none;
+  background:
+    radial-gradient(
+      120% 140% at 0% 0%,
+      color-mix(in srgb, var(--brand-cyan) 9%, transparent) 0%,
+      transparent 60%
+    ),
+    var(--surface-1);
+  box-shadow: var(--shadow-sm);
 }
 
 .next-idle-head {
@@ -264,13 +280,19 @@
   width: 44px;
   height: 44px;
   border-radius: var(--radius-full);
-  background: var(--surface-3);
-  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--brand-cyan) 12%, var(--surface-3));
+  color: var(--brand-cyan);
+}
+
+.next-idle-copy {
+  min-width: 0;
 }
 
 .next-idle-title {
   font-size: var(--text-lg);
+  line-height: 1.25;
   letter-spacing: var(--tracking-tight);
+  text-wrap: balance;
 }
 
 .next-idle-message {
@@ -279,6 +301,51 @@
   font-size: var(--text-base);
   line-height: 1.55;
   color: var(--text-secondary);
+}
+
+/* Two up on a phone; the odd cell out spans the row rather than sitting orphaned. */
+.next-idle-facts > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.next-idle-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.next-idle-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 22ch;
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+  transition:
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
+}
+
+.next-idle-link .ui-icon {
+  flex: none;
+  color: var(--brand-cyan);
+}
+
+.next-idle-link:hover {
+  border-color: var(--line-accent);
+  background: var(--surface-3);
+}
+
+.next-idle-link:focus-visible {
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 2px;
 }
 
 /* ---- Larger screens ---------------------------------------------------------------------- */
@@ -294,7 +361,15 @@
     gap: var(--space-5);
   }
 
+  /* Source order is countdown-first for the phone; the wide layout puts it back on the right. */
+  .next-ident {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
   .next-count {
+    grid-column: 2;
+    grid-row: 1;
     align-items: flex-end;
     text-align: end;
   }

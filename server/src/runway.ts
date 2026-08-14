@@ -687,7 +687,8 @@ export function predictArrivalRunway(
 /**
  * The runway a departure will use. This is purely a statement of the active configuration — a
  * jet at the stand has no geometry to read — so it carries the configuration's own confidence,
- * and reports nothing at all when the configuration lists more than one candidate.
+ * is always `inferred` rather than observed, and reports nothing at all when the configuration
+ * lists more than one candidate.
  */
 export function predictDepartureRunway(config: RunwayConfig): RunwayPrediction {
   try {
@@ -707,9 +708,11 @@ export function predictDepartureRunway(config: RunwayConfig): RunwayPrediction {
     const confidence = clamp01(finite(config.confidence) ?? 0);
     if (confidence <= 0) return noPrediction();
 
+    // Never 'observed'. No geometry was read: this is the airport's configuration speaking about
+    // a runway an aeroplane at the stand has not touched yet, however well the traffic agreed.
     return {
       runway,
-      source: confidence >= 0.5 ? 'observed' : 'inferred',
+      source: 'inferred',
       confidence: round2(confidence),
     };
   } catch (err) {

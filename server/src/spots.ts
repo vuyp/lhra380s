@@ -15,6 +15,7 @@
  *   golden hour              0–8   the hour either side of sunrise and sunset
  *   configuration penalty  −12–0   we do not know the config well enough to send you there
  *   weather penalty        −18–0   you will not see much through fog, or hold a lens in a gale
+ *   airside penalty          −25   you cannot get in without a boarding pass
  *
  * A spot whose runways are not in use is capped at 32 — "poor" — however beautiful the light,
  * because there will be nothing to photograph.
@@ -52,6 +53,13 @@ const SCORE_DEPARTING_MATCH = 32;
 const SCORE_DEPARTING_MISMATCH = 12;
 /** We do not know which way the airport is working, so every spot is equally plausible. */
 const SCORE_DIRECTION_UNKNOWN = 20;
+
+/**
+ * Charged against a spot you cannot walk into. "Where to stand right now" has to mean somewhere
+ * you can actually stand: the Terminal 4 deck is a fine place to watch a runway and no use at all
+ * on a day you are not flying, so it ranks below every free roadside spot without being hidden.
+ */
+const PENALTY_AIRSIDE = 25;
 
 /** Ceiling applied when none of the spot's runways are in use. */
 const WRONG_RUNWAY_CAP = 32;
@@ -295,19 +303,33 @@ interface RunwayFit {
   offConfig: boolean;
 }
 
-function firstMatch(goodFor: string[], active: string[]): string | null {
-  for (const designator of goodFor) {
-    if (typeof designator !== 'string') continue;
-    const wanted = designator.toUpperCase();
+function designators(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => (typeof entry === 'string' ? [entry.toUpperCase()] : []));
+}
+
+function firstMatch(covered: string[], active: string[]): string | null {
+  for (const designator of covered) {
     for (const candidate of active) {
-      if (typeof candidate === 'string' && candidate.toUpperCase() === wanted) return wanted;
+      if (candidate === designator) return designator;
     }
   }
   return null;
 }
 
+/**
+ * How much of what this spot is for is actually happening.
+ *
+ * The two lists are matched against the two roles separately, and that is the whole point:
+ * Myrtle Avenue and Stanwell Moor both stand beside runway 27L, one under the approach and one
+ * under the climb-out, and only one of them is worth a Tube fare on a westerly afternoon. A spot
+ * whose *arrivals* runway is landing scores highest; a spot whose *departures* runway is
+ * departing scores well; a spot that covers a runway in the other role gets the crumbs, because
+ * it is at the wrong end of it.
+ */
 function runwayFit(spot: SpotLocation, config: RunwayConfig): RunwayFit {
-  const goodFor = Array.isArray(spot.goodFor) ? spot.goodFor : [];
+  const arrivalsFor = designators(spot.arrivalsFor);
+  const departuresFor = designators(spot.departuresFor);
 
   if (config.direction === 'unknown') {
     return {
@@ -317,48 +339,56 @@ function runwayFit(spot: SpotLocation, config: RunwayConfig): RunwayFit {
     };
   }
 
-  const landing = Array.isArray(config.landing) ? config.landing : [];
-  const departing = Array.isArray(config.departing) ? config.departing : [];
-  const seesArrivals = spot.sees === 'arrivals' || spot.sees === 'both';
-  const seesDepartures = spot.sees === 'departures' || spot.sees === 'both';
+  const landing = designators(config.landing);
+  const departing = designators(config.departing);
 
   // Landings first: they are the reason almost everyone comes, and they are the thing this app
-  // can predict. A spot that covers a landing runway is scored on that even if it also happens
-  // to cover a departure runway.
-  const landingMatch = firstMatch(goodFor, landing);
+  // can predict.
+  const landingMatch = firstMatch(arrivalsFor, landing);
   if (landingMatch !== null) {
-    return seesArrivals
-      ? {
-          score: SCORE_LANDING_MATCH,
-          reason: `Landing ${landingMatch} — a runway this spot covers`,
-          offConfig: false,
-        }
-      : {
-          score: SCORE_LANDING_MISMATCH,
-          reason: `${landingMatch} is landing today, and this is a departures spot`,
-          offConfig: false,
-        };
+    return {
+      score: SCORE_LANDING_MATCH,
+      reason: `Landing ${landingMatch} — arrivals you can watch from here`,
+      offConfig: false,
+    };
   }
 
-  const departingMatch = firstMatch(goodFor, departing);
+  const departingMatch = firstMatch(departuresFor, departing);
   if (departingMatch !== null) {
-    return seesDepartures
-      ? {
-          score: SCORE_DEPARTING_MATCH,
-          reason: `Departing ${departingMatch} — a runway this spot covers`,
-          offConfig: false,
-        }
-      : {
-          score: SCORE_DEPARTING_MISMATCH,
-          reason: `${departingMatch} is departing today, and this is an arrivals spot`,
-          offConfig: false,
-        };
+    return {
+      score: SCORE_DEPARTING_MATCH,
+      reason: `Departing ${departingMatch} — departures you can watch from here`,
+      offConfig: false,
+    };
   }
 
-  const covered = goodFor.length > 0 ? goodFor.join('/') : 'this spot';
+  // The right runway, the wrong end of it: something will happen on the concrete this spot
+  // faces, but not the part of it you came to see.
+  const wrongRole = firstMatch(arrivalsFor, departing);
+  if (wrongRole !== null) {
+    return {
+      score: SCORE_LANDING_MISMATCH,
+      reason: `${wrongRole} is departing rather than landing — you are at the approach end`,
+      offConfig: false,
+    };
+  }
+
+  const wrongRoleOut = firstMatch(departuresFor, landing);
+  if (wrongRoleOut !== null) {
+    return {
+      score: SCORE_DEPARTING_MISMATCH,
+      reason: `${wrongRoleOut} is landing rather than departing — the traffic touches down away from here`,
+      offConfig: false,
+    };
+  }
+
+  const covered = [...new Set([...arrivalsFor, ...departuresFor])];
   return {
     score: 0,
-    reason: `Nothing on ${covered} under ${config.direction} operations`,
+    reason:
+      covered.length > 0
+        ? `Nothing on ${covered.join('/')} under ${config.direction} operations`
+        : `Nothing this spot covers is in use under ${config.direction} operations`,
     offConfig: true,
   };
 }
@@ -383,7 +413,16 @@ function evaluateOne(
   let score = BASE_SCORE + fit.score + SCORE_LIGHT[light];
   if (sun?.goldenHour === true) score += SCORE_GOLDEN[light];
 
-  const reasons: string[] = [fit.reason, lightReason(spot, now, light)];
+  const reasons: string[] = [fit.reason];
+
+  // Second in the list, so it survives the three-reason cap: a reader sorting by "best now" has
+  // to learn that this one is behind security before they learn anything about the light.
+  if (spot.accessType === 'airside') {
+    score -= PENALTY_AIRSIDE;
+    reasons.push('Airside — only reachable with a boarding pass');
+  }
+
+  reasons.push(lightReason(spot, now, light));
 
   const confidence = clamp(finite(config?.confidence ?? null) ?? 0, 0, 1);
   if (config.direction !== 'unknown') {

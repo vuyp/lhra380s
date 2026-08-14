@@ -11,7 +11,13 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { isTakeoffRoll, looksLikeArrival, type ArrivalEvidence, type RollEvidence } from '../src/tracker.ts';
+import {
+  assessArrival,
+  isTakeoffRoll,
+  looksLikeArrival,
+  type ArrivalEvidence,
+  type RollEvidence,
+} from '../src/tracker.ts';
 import { lookupRoute } from '../src/reference.ts';
 import { bearing, destinationPoint, distanceNm, type LatLon } from '../src/geo.ts';
 
@@ -23,13 +29,16 @@ function inboundFrom(radialFromAirport: number, distance: number, trackError = 0
   return { position, track: bearing(position, LHR) + trackError };
 }
 
-function evidence(partial: Partial<ArrivalEvidence> & { position: LatLon; track: number }): ArrivalEvidence {
+function evidence(partial: Partial<ArrivalEvidence> & { position: LatLon; track: number | null }): ArrivalEvidence {
   return {
     distanceNm: distanceNm(partial.position, LHR),
     altitudeFt: null,
     verticalRateFpm: null,
+    groundSpeedKts: null,
     closing: true,
     scheduledToAirport: false,
+    cruiseAltitudeFt: null,
+    cruiseSpeedKts: null,
     ...partial,
   };
 }
@@ -98,11 +107,15 @@ describe('looksLikeArrival — the ones that must never reach the board', () => 
     );
   });
 
-  it('rejects the cruising overflights seen live on the A388 feed', () => {
-    // Taken off api.adsb.lol/v2/type/A388: all closing on Heathrow, all pointing at it, none of
-    // them coming here — DLH3Y and DLH8P are Frankfurt–US, ETD1VT and SIA326 are eastbound
-    // Europe–US crossings, UAE19 is a Dubai–North America sector.
-    const overflights: Array<[string, LatLon, number, number, number]> = [
+  it('asserts nothing about an A380 at cruise hundreds of miles out', () => {
+    // Real frames off api.adsb.lol/v2/type/A388: all closing on Heathrow, all pointing at it, all
+    // still in the flight levels several hundred miles away over central and eastern Europe.
+    //
+    // Some of these aeroplanes went on to land at Heathrow and some did not — UAE70M, recorded
+    // here over Bavaria at FL400, touched down at Heathrow about ninety minutes later. That is
+    // exactly the point: at this range and this altitude nothing in the data distinguishes them,
+    // so the honest answer is "not yet", and the flight is picked up when it starts down.
+    const cruising: Array<[string, LatLon, number, number, number]> = [
       ['DLH3Y', { lat: 49.921409, lon: 9.699592 }, 288.1, 33_975, 320],
       ['UAE70M', { lat: 49.478302, lon: 11.105009 }, 292.08, 40_000, 0],
       ['ETD1VT', { lat: 47.267212, lon: 13.471161 }, 301.41, 38_000, 0],
@@ -110,11 +123,11 @@ describe('looksLikeArrival — the ones that must never reach the board', () => 
       ['UAE19', { lat: 44.256821, lon: 21.574467 }, 297.1, 40_000, 0],
       ['UAE7V', { lat: 38.940811, lon: 21.86745 }, 322.05, 40_000, 256],
     ];
-    for (const [label, position, track, altitudeFt, verticalRateFpm] of overflights) {
+    for (const [label, position, track, altitudeFt, verticalRateFpm] of cruising) {
       assert.equal(
         looksLikeArrival(evidence({ position, track, altitudeFt, verticalRateFpm })),
         false,
-        `${label} is crossing Europe at cruise, not arriving at Heathrow`,
+        `${label} is at cruise far from Heathrow — nothing may be asserted about it yet`,
       );
     }
   });
@@ -158,15 +171,7 @@ describe('looksLikeArrival — the ones that must never reach the board', () => 
   it('rejects an aircraft with no transmitted track', () => {
     const position = destinationPoint(LHR, 90, 40);
     assert.equal(
-      looksLikeArrival({
-        position,
-        distanceNm: 40,
-        track: null,
-        altitudeFt: 9_000,
-        verticalRateFpm: -900,
-        closing: true,
-        scheduledToAirport: false,
-      }),
+      looksLikeArrival(evidence({ position, track: null, altitudeFt: 9_000, verticalRateFpm: -900 })),
       false,
     );
   });
@@ -176,6 +181,117 @@ describe('looksLikeArrival — the ones that must never reach the board', () => 
     assert.equal(
       looksLikeArrival(evidence({ position, track, altitudeFt: 39_000, scheduledToAirport: true })),
       false,
+    );
+  });
+});
+
+describe('looksLikeArrival — descent is measured against the aircraft’s own cruise', () => {
+  it('reads a step-down descent as a descent even when the vertical rate reads zero', () => {
+    // Real descents are flown in steps, and the feed samples the level bits: an aeroplane that has
+    // come down from FL400 to FL340 is descending, whatever this particular frame says. The old
+    // absolute test asked "is it below 29 000 ft", called FL340 cruise, and threw the flight away.
+    const { position, track } = inboundFrom(110, 130);
+    assert.equal(
+      looksLikeArrival(
+        evidence({
+          position,
+          track,
+          altitudeFt: 34_000,
+          verticalRateFpm: 0,
+          cruiseAltitudeFt: 40_000,
+        }),
+      ),
+      true,
+      'an aircraft 6 000 ft below its own cruise is on the way down',
+    );
+  });
+
+  it('still rejects an aircraft sitting at its own cruise level', () => {
+    // Same geometry, same altitude — but this one has been at FL340 the whole time, so FL340 is
+    // where it lives, not somewhere it is passing through.
+    const { position, track } = inboundFrom(110, 130);
+    assert.equal(
+      looksLikeArrival(
+        evidence({
+          position,
+          track,
+          altitudeFt: 34_000,
+          verticalRateFpm: 0,
+          cruiseAltitudeFt: 34_000,
+        }),
+      ),
+      false,
+    );
+  });
+
+  it('does not mistake a shallow level-off for a descent', () => {
+    const { position, track } = inboundFrom(110, 130);
+    assert.equal(
+      looksLikeArrival(
+        evidence({ position, track, altitudeFt: 39_000, verticalRateFpm: 0, cruiseAltitudeFt: 40_000 }),
+      ),
+      false,
+      '1 000 ft off cruise is a level change, not top of descent',
+    );
+  });
+});
+
+describe('assessArrival — the board says how sure it is', () => {
+  it('grades an en-route descent as likely, and firms it up once speed decays too', () => {
+    const { position, track } = inboundFrom(100, 120);
+    const descending = evidence({
+      position,
+      track,
+      altitudeFt: 30_000,
+      verticalRateFpm: -1400,
+      groundSpeedKts: 470,
+      cruiseAltitudeFt: 40_000,
+      cruiseSpeedKts: 480,
+    });
+    assert.equal(assessArrival(descending), 'likely');
+
+    assert.equal(
+      assessArrival({ ...descending, groundSpeedKts: 400 }),
+      'confirmed',
+      'coming down AND slowing up is an arrival doing both the things an arrival does',
+    );
+  });
+
+  it('confirms an aircraft established on the approach', () => {
+    const { position, track } = inboundFrom(90, 20);
+    assert.equal(
+      assessArrival(evidence({ position, track, altitudeFt: 4_000, verticalRateFpm: -700 })),
+      'confirmed',
+    );
+  });
+
+  it('will not confirm a timetabled rotation that is still an ocean away', () => {
+    // The schedule is a plan. It earns a place on the board; it does not earn "observed".
+    const { position, track } = inboundFrom(120, 1_800);
+    assert.equal(
+      assessArrival(
+        evidence({ position, track, altitudeFt: 39_000, verticalRateFpm: 0, scheduledToAirport: true }),
+      ),
+      'likely',
+    );
+  });
+
+  it('returns none — not a weak yes — for the cruising overflights', () => {
+    const position: LatLon = { lat: 51.5296, lon: 0.985 };
+    assert.equal(
+      assessArrival(
+        evidence({
+          position,
+          track: 277.7,
+          altitudeFt: 36_000,
+          verticalRateFpm: -64,
+          cruiseAltitudeFt: 36_025,
+          groundSpeedKts: 468,
+          cruiseSpeedKts: 475,
+        }),
+      ),
+      'none',
+      'DLH3Y, recorded live at 100 nm pointing within 8° of Heathrow at FL360',
     );
   });
 });

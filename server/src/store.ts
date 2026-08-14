@@ -118,10 +118,10 @@ export class MovementStore {
     }
   }
 
-  /** Movements from the last `hours` hours, newest first. */
-  recent(hours: number): LoggedMovement[] {
+  /** Movements from the last `hours` hours, newest first. `now` is injectable for tests. */
+  recent(hours: number, now: number = Date.now()): LoggedMovement[] {
     const span = Number.isFinite(hours) ? Math.max(0, hours) : 0;
-    const cutoff = Date.now() - span * 3_600_000;
+    const cutoff = now - span * 3_600_000;
     const out: LoggedMovement[] = [];
     for (let i = this.entries.length - 1; i >= 0; i -= 1) {
       const entry = this.entries[i];
@@ -144,9 +144,14 @@ export class MovementStore {
     return out;
   }
 
-  /** Counts for the current Europe/London calendar day. */
-  todayCounts(): { arrivals: number; departures: number; airframes: number } {
-    const now = Date.now();
+  /**
+   * Counts for the current Europe/London calendar day.
+   *
+   * The day boundary is London's, not UTC's: through BST a movement at 23:30 UTC has already
+   * happened at 00:30 tomorrow at the fence, and the board must agree with the clock on the
+   * spotter's wrist. `now` is injectable so that boundary can be tested without waiting for it.
+   */
+  todayCounts(now: number = Date.now()): { arrivals: number; departures: number; airframes: number } {
     const today = londonDay(now);
     // A London day can only overlap the last 48 h, so we never have to scan the whole log.
     const horizon = now - 48 * 3_600_000;

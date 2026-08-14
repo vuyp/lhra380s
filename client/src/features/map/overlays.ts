@@ -191,9 +191,16 @@ export function createRunwayOverlay(): RunwayOverlay {
         interactive: true,
         bubblingMouseEvents: false,
       });
-      strip.bindTooltip(runwayTooltip(runway, config), {
+      const description = runwayTooltip(runway, config);
+      strip.bindTooltip(description, {
         direction: 'top',
         className: 'map-tooltip',
+      });
+      // The strip is a tab stop, so it has to say what it is. A Leaflet tooltip is hover-only and
+      // is never exposed as the element's accessible name, which left two silent focus stops
+      // between the map canvas and everything else on it.
+      strip.on('add', () => {
+        strip.getElement()?.setAttribute('aria-label', description);
       });
       strip.addTo(layer);
 
@@ -213,7 +220,9 @@ export function createRunwayOverlay(): RunwayOverlay {
             {
               className: 'map-centreline map-centreline--landing',
               weight: 2,
-              dashArray: '9 11',
+              // Long dashes for the approach, short ones for the climb-out below: the two lines
+              // must be tellable apart without relying on their colour.
+              dashArray: '14 8',
               interactive: false,
             },
           ).addTo(layer);
@@ -230,7 +239,7 @@ export function createRunwayOverlay(): RunwayOverlay {
             {
               className: 'map-centreline map-centreline--departing',
               weight: 2,
-              dashArray: '9 11',
+              dashArray: '3 7',
               interactive: false,
             },
           ).addTo(layer);
@@ -301,6 +310,12 @@ function spotCard(evaluation: SpotEvaluation, onOpen: () => void): HTMLElement {
 export interface SpotOverlay {
   layer: L.LayerGroup;
   update(spots: readonly SpotEvaluation[]): void;
+  /**
+   * The marker for one spot id, or null when it is not on the map. Used when another tab hands
+   * the map a specific spot to show, so it can be centred and opened rather than left as one
+   * anonymous pin among eleven.
+   */
+  markerFor(spotId: string): L.Marker | null;
 }
 
 /**
@@ -309,9 +324,11 @@ export interface SpotOverlay {
  */
 export function createSpotOverlay(options: { onOpenSpot: (spot: SpotLocation) => void }): SpotOverlay {
   const layer = L.layerGroup();
+  const markers = new Map<string, L.Marker>();
 
   const update = (spots: readonly SpotEvaluation[]): void => {
     layer.clearLayers();
+    markers.clear();
 
     for (const evaluation of spots) {
       const marker = L.marker([evaluation.spot.lat, evaluation.spot.lon], {
@@ -342,8 +359,9 @@ export function createSpotOverlay(options: { onOpenSpot: (spot: SpotLocation) =>
       });
 
       marker.addTo(layer);
+      if (typeof evaluation.spot.id === 'string') markers.set(evaluation.spot.id, marker);
     }
   };
 
-  return { layer, update };
+  return { layer, update, markerFor: (spotId) => markers.get(spotId) ?? null };
 }

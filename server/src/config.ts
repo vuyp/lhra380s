@@ -10,15 +10,9 @@
 import { fileURLToPath } from 'node:url';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
+import { createLogger, setLogLevel, type Logger } from './log.ts';
 
-const LEVEL_WEIGHT: Record<LogLevel, number> = {
-  debug: 10,
-  info: 20,
-  warn: 30,
-  error: 40,
-  silent: 100,
-};
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
 
 function readEnv(name: string): string | null {
   const raw = process.env[name];
@@ -180,30 +174,11 @@ export const CONFIG: Config = {
   },
 };
 
-function emit(level: Exclude<LogLevel, 'silent'>, args: unknown[]): void {
-  if (LEVEL_WEIGHT[level] < LEVEL_WEIGHT[CONFIG.logLevel]) return;
-  const prefix = `${new Date().toISOString()} ${level.toUpperCase().padEnd(5)}`;
-  if (level === 'warn' || level === 'error') {
-    console.error(prefix, ...args);
-  } else {
-    console.log(prefix, ...args);
-  }
-}
+// One logger for the whole process, implemented in log.ts. Modules that already import CONFIG get
+// it from here so they need only one import; nothing else about it differs.
+setLogLevel(CONFIG.logLevel);
 
 /** Tiny level-filtered logger. Everything server-side logs through this. */
-export const log = {
-  debug(...args: unknown[]): void {
-    emit('debug', args);
-  },
-  info(...args: unknown[]): void {
-    emit('info', args);
-  },
-  warn(...args: unknown[]): void {
-    emit('warn', args);
-  },
-  error(...args: unknown[]): void {
-    emit('error', args);
-  },
-};
+export const log: Logger = createLogger();
 
 export default CONFIG;

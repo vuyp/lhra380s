@@ -83,9 +83,11 @@ export function formatAge(seconds: number): string {
 }
 
 const SOURCE_WORDS: Record<Provenance, string> = {
-  observed: 'from live traffic',
+  observed: 'read off this aircraft',
   schedule: 'from the rotation table',
-  inferred: 'inferred from the track',
+  // Covers both an approach not yet established and the active configuration standing in for one,
+  // so it must not claim the track was what produced it.
+  inferred: 'derived, not observed',
   unknown: 'no basis yet',
 };
 
@@ -113,6 +115,14 @@ export function runwayHint(runway: RunwayPrediction): {
   }
   const source = SOURCE_WORDS[runway.source] ?? SOURCE_WORDS.unknown;
   const confidence = confidenceWord(runway.confidence);
+  // A runway read off the aircraft's own geometry is a fact; only the rest are predictions.
+  if (runway.source === 'observed') {
+    return {
+      label: runway.runway,
+      short: `observed · ${confidence}`,
+      detail: `Runway ${runway.runway} — ${source}, ${confidence}`,
+    };
+  }
   return {
     label: runway.runway,
     short: `predicted · ${confidence}`,
@@ -120,18 +130,30 @@ export function runwayHint(runway: RunwayPrediction): {
   };
 }
 
-/** Named ends of a route, or null when we have not matched the far end to a real place. */
+/** True for the Heathrow end of a route — never a valid *far* end of one. */
+function isHeathrow(place: Place | null): boolean {
+  if (!place) return false;
+  return place.icao?.toUpperCase() === 'EGLL' || place.iata?.toUpperCase() === 'LHR';
+}
+
+/**
+ * Named ends of a route, or null when we have not matched the far end to a real place.
+ *
+ * The Heathrow end is never the far end. A parked aircraft whose only known endpoint was
+ * Heathrow itself used to render "London → LHR", which reads as a flight from London to London
+ * and is not a route at all — it is the one place we already know it is.
+ */
 export function routeEnds(
   route: { origin: Place | null; destination: Place | null },
   kind: MovementKind,
 ): { from: string; to: string } | null {
-  const origin = placeLabel(route.origin);
-  const destination = placeLabel(route.destination);
+  const origin = isHeathrow(route.origin) ? null : placeLabel(route.origin);
+  const destination = isHeathrow(route.destination) ? null : placeLabel(route.destination);
   if (kind === 'arrival') return origin ? { from: origin, to: 'LHR' } : null;
   if (kind === 'departure') return destination ? { from: 'LHR', to: destination } : null;
-  // Parked: name whichever leg we actually hold.
-  if (origin) return { from: origin, to: 'LHR' };
+  // Parked: name whichever leg we actually hold, if either is a real place elsewhere.
   if (destination) return { from: 'LHR', to: destination };
+  if (origin) return { from: origin, to: 'LHR' };
   return null;
 }
 
@@ -144,6 +166,93 @@ export function formatVerticalRate(rate: number | null): string | null {
   if (rate <= -250) return `descending ${rateFormatter.format(rounded)} fpm`;
   if (rate >= 250) return `climbing ${rateFormatter.format(rounded)} fpm`;
   return 'level';
+}
+
+interface TelemetryCell {
+  term: string;
+  value: string;
+  title?: string;
+}
+
+/** The four cells an airborne movement is described by. */
+function flightCells(
+  movement: Movement,
+  units: 'metric' | 'imperial',
+  runway: { label: string; detail: string },
+): TelemetryCell[] {
+  const { telemetry } = movement;
+  return [
+    {
+      term: 'Altitude',
+      value: formatAltitude(telemetry.altitude, telemetry.onGround, units),
+    },
+    { term: 'Speed', value: formatSpeed(telemetry.groundSpeed, units) },
+    {
+      term: 'Distance',
+      value:
+        movement.distanceNm === null
+          ? DASH
+          : `${formatDistance(movement.distanceNm, units)} ${compassPoint(movement.bearingFromAirport)}`,
+    },
+    { term: 'Est. runway', value: runway.label, title: runway.detail },
+  ];
+}
+
+/**
+ * A whale parked at Heathrow, described by facts that are actually about a parked whale.
+ *
+ * The airborne set reused here read "On ground · 0 kt · 0.7 nm ENE · runway TBC" — four cells
+ * saying nothing, including a runway estimate for an aeroplane that is not going anywhere. What a
+ * spotter wants is when it landed, how long it has been down, and where on the field it is.
+ */
+function groundCells(
+  movement: Movement,
+  now: number,
+  units: 'metric' | 'imperial',
+  runway: { label: string; detail: string },
+): TelemetryCell[] {
+  const landedAt = movement.actualAt;
+  const moving = (movement.telemetry.groundSpeed ?? 0) >= 3;
+
+  const since: TelemetryCell =
+    landedAt !== null
+      ? {
+          term: 'On the ground',
+          value: formatAge(Math.max(0, (now - landedAt) / 1000)),
+          title: 'Since the touchdown this app watched happen',
+        }
+      : {
+          term: 'Tracked for',
+          value: formatAge(Math.max(0, (now - movement.firstSeen) / 1000)),
+          title: 'We did not see it land — this is how long it has been on the feed here',
+        };
+
+  const landed: TelemetryCell =
+    landedAt !== null
+      ? { term: 'Landed', value: formatClock(landedAt) }
+      : { term: 'Landed', value: 'not observed', title: 'It was already on the ground when we picked it up' };
+
+  const observedRunway = movement.runway.source === 'observed' && movement.runway.runway !== null;
+  const runwayCell: TelemetryCell = observedRunway
+    ? { term: 'Landing runway', value: runway.label, title: runway.detail }
+    : {
+        term: 'Landing runway',
+        value: DASH,
+        title: 'Not observed — the touchdown was not seen from a position we could read a runway from',
+      };
+
+  const where: TelemetryCell = moving
+    ? { term: 'Taxi speed', value: formatSpeed(movement.telemetry.groundSpeed, units) }
+    : {
+        term: 'Where',
+        value:
+          movement.distanceNm === null
+            ? DASH
+            : `${formatDistance(movement.distanceNm, units)} ${compassPoint(movement.bearingFromAirport)}`,
+        title: 'Straight-line distance and direction from the aerodrome reference point',
+      };
+
+  return [since, landed, runwayCell, where];
 }
 
 export function MovementCard(p: { movement: Movement; now: number }): ReactElement {
@@ -170,7 +279,15 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
   const classes = ['mv', `mv--${kind}`];
   if (selectedHex === movement.id) classes.push('mv--selected');
 
+  const cells =
+    kind === 'ground'
+      ? groundCells(movement, now, settings.units, runway)
+      : flightCells(movement, settings.units, runway);
+
   const vertical = telemetry.onGround ? null : formatVerticalRate(telemetry.verticalRate);
+  // The title already falls back to the callsign, so only show it again when it adds something.
+  const title = flightTitle(movement);
+  const secondaryCallsign = movement.callsign !== null && movement.callsign !== title;
 
   return (
     <Card
@@ -182,8 +299,8 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
       <div className="mv-head">
         <div className="mv-ident">
           <span className="mv-flightline">
-            <span className="mv-flight app-numeric">{flightTitle(movement)}</span>
-            {movement.callsign && movement.callsign !== movement.flightNumber ? (
+            <span className="mv-flight app-numeric">{title}</span>
+            {secondaryCallsign ? (
               <span className="mv-callsign app-numeric" title="Transmitted callsign">
                 {movement.callsign}
               </span>
@@ -246,40 +363,19 @@ export function MovementCard(p: { movement: Movement; now: number }): ReactEleme
         ) : (
           <span className="mv-reg mv-reg--unknown">Registration unknown</span>
         )}
-        {note ? (
-          <Chip size="sm" tone="neutral" title={note}>
-            {note}
-          </Chip>
-        ) : null}
+        {/* A livery note is a sentence, not a token — it wraps rather than being clipped. */}
+        {note ? <span className="mv-note">{note}</span> : null}
       </p>
 
       <dl className="mv-telem">
-        <div className="mv-telem-item">
-          <dt>Altitude</dt>
-          <dd className="app-numeric">
-            {formatAltitude(telemetry.altitude, telemetry.onGround, settings.units)}
-          </dd>
-        </div>
-        <div className="mv-telem-item">
-          <dt>Speed</dt>
-          <dd className="app-numeric">{formatSpeed(telemetry.groundSpeed, settings.units)}</dd>
-        </div>
-        <div className="mv-telem-item">
-          <dt>Distance</dt>
-          <dd className="app-numeric">
-            {movement.distanceNm === null
-              ? DASH
-              : `${formatDistance(movement.distanceNm, settings.units)} ${compassPoint(
-                  movement.bearingFromAirport,
-                )}`}
-          </dd>
-        </div>
-        <div className="mv-telem-item">
-          <dt>Est. runway</dt>
-          <dd className="app-numeric" title={runway.detail}>
-            {runway.label}
-          </dd>
-        </div>
+        {cells.map((cell) => (
+          <div className="mv-telem-item" key={cell.term}>
+            <dt>{cell.term}</dt>
+            <dd className="app-numeric" title={cell.title}>
+              {cell.value}
+            </dd>
+          </div>
+        ))}
       </dl>
 
       {stale || vertical !== null ? (

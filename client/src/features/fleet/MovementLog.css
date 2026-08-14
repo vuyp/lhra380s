@@ -32,9 +32,7 @@
   /* The blurred bar reaches the gutters while the text stays on the content grid. */
   margin-inline: calc(var(--space-4) * -1);
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-glass);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  background: var(--surface-sticky);
   border-block-end: 1px solid var(--line);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
@@ -152,7 +150,10 @@
 .log-primary {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  /* The route drops to its own line rather than being clipped: "Origin unknown" is the
+     honest label and it must stay readable at phone width. */
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
   min-width: 0;
   font-size: var(--text-base);
   line-height: 1.35;

@@ -20,7 +20,13 @@ export type SnapshotState = {
   snapshot: Snapshot | null;
   connected: boolean;
   error: string | null;
+  /**
+   * When this device last received a genuinely new snapshot. A service-worker cache replay does
+   * not move it — an offline app must not claim its frozen data is "from just now".
+   */
   lastUpdate: number | null;
+  /** True while the newest response we hold came out of the service-worker cache, not the server. */
+  fromCache: boolean;
   loading: boolean;
 };
 
@@ -29,8 +35,12 @@ const INITIAL: SnapshotState = {
   connected: false,
   error: null,
   lastUpdate: null,
+  fromCache: false,
   loading: true,
 };
+
+/** Set by client/public/sw.js on a response it served from its own cache. */
+const FROM_CACHE_HEADER = 'x-ww-from-cache';
 
 /** How often we poll while the stream is down. */
 const POLL_MS = 10_000;
@@ -73,15 +83,33 @@ export function SnapshotProvider(props: { children: ReactNode }): ReactElement {
     let retryTimer: number | undefined;
     let attempt = 0;
 
-    const apply = (value: unknown): void => {
+    const apply = (value: unknown, fromCache = false): void => {
       if (!alive || !isSnapshot(value)) return;
-      setState((prev) => ({
-        ...prev,
-        snapshot: value,
-        error: null,
-        lastUpdate: Date.now(),
-        loading: false,
-      }));
+      setState((prev) => {
+        if (!fromCache) {
+          return {
+            ...prev,
+            snapshot: value,
+            error: null,
+            lastUpdate: Date.now(),
+            fromCache: false,
+            loading: false,
+          };
+        }
+        // The service worker answered from its own cache: the server was not reached, so nothing
+        // about the world is newer than it was. Keep what we hold, leave `lastUpdate` where it
+        // is so the banner and the per-card staleness chips age honestly, and — on a cold start
+        // with nothing else — date the cached body by the moment the server built it.
+        if (prev.snapshot !== null) return { ...prev, fromCache: true, loading: false };
+        return {
+          ...prev,
+          snapshot: value,
+          error: null,
+          lastUpdate: Number.isFinite(value.ts) ? value.ts : null,
+          fromCache: true,
+          loading: false,
+        };
+      });
     };
 
     const fetchSnapshot = async (): Promise<void> => {
@@ -91,7 +119,8 @@ export function SnapshotProvider(props: { children: ReactNode }): ReactElement {
           cache: 'no-store',
         });
         if (!response.ok) throw new Error(`Server responded ${response.status}`);
-        apply((await response.json()) as unknown);
+        const cached = response.headers.get(FROM_CACHE_HEADER) !== null;
+        apply((await response.json()) as unknown, cached);
       } catch (error) {
         if (!alive) return;
         setState((prev) => ({

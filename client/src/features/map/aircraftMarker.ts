@@ -53,6 +53,10 @@ const SCALE: Record<'ground' | 'airborne' | 'selected', number> = {
 function iconHtml(): string {
   return (
     '<span class="map-plane-halo" aria-hidden="true"></span>' +
+    // Role, told without colour: a chevron pointing down for an arrival, up for a departure.
+    // It sits outside the rotating span so it stays screen-oriented at any heading, and it is
+    // the second channel the glow alone could not provide.
+    '<span class="map-plane-badge" aria-hidden="true"></span>' +
     '<span class="map-plane">' +
     `<svg class="map-plane-art" viewBox="0 0 64 64" width="${ART_SIZE}" height="${ART_SIZE}" ` +
     'aria-hidden="true" focusable="false">' +

@@ -12,18 +12,30 @@
 
 import { useId } from 'react';
 import type { ReactElement } from 'react';
-import type { SpotEvaluation, SunInfo } from '../../../../shared/types.ts';
+import type { SpotEvaluation, SpotLocation, SunInfo } from '../../../../shared/types.ts';
 import { Card } from '../../components/ui/Card.tsx';
 import { Chip } from '../../components/ui/Chip.tsx';
 import { Icon } from '../../components/ui/Icon.tsx';
 import type { Tone } from '../../components/ui/Chip.tsx';
 import { compassPoint } from '../../lib/format.ts';
+import { navigateTo } from '../../state/route.ts';
 import { SunDial, lightLabel, lightMeaning } from './SunDial.tsx';
 import './SpotCard.css';
 
 type Rating = SpotEvaluation['rating'];
 type Light = SpotEvaluation['light'];
-type Sees = SpotEvaluation['spot']['sees'];
+
+/** What a spot is set up to watch, derived from the two runway lists — never stated twice. */
+type Sees = 'arrivals' | 'departures' | 'both' | 'none';
+type Role = 'arrivals' | 'departures';
+
+function seesOf(spot: SpotLocation): Sees {
+  const arrivals = spot.arrivalsFor.length > 0;
+  const departures = spot.departuresFor.length > 0;
+  if (arrivals && departures) return 'both';
+  if (arrivals) return 'arrivals';
+  return departures ? 'departures' : 'none';
+}
 
 const KM_PER_MILE = 1.609344;
 
@@ -53,12 +65,14 @@ const SEES_CHIPS: Record<Sees, string> = {
   arrivals: 'Arrivals',
   departures: 'Departures',
   both: 'Arrivals & departures',
+  none: 'What it sees is unrecorded',
 };
 
 const SEES_SENTENCES: Record<Sees, string> = {
   arrivals: 'Landing traffic only — aircraft on final, wheels down, coming towards you.',
   departures: 'Departing traffic only — the roll, the rotation and the climb-out.',
   both: 'Both boards: arrivals on final and departures climbing out.',
+  none: 'What this spot sees is not recorded.',
 };
 
 /**
@@ -81,23 +95,36 @@ function directionsHref(lat: number, lon: number): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
 }
 
-function runwayTone(runway: string, landing: string[], departing: string[]): Tone {
-  if (landing.includes(runway)) return 'arrival';
-  if (departing.includes(runway)) return 'departure';
-  return 'neutral';
+/**
+ * A runway is only "in use" for this spot when it is in use *in the role this spot watches it in*.
+ * Stanwell Moor stands under the 27L climb-out: 27L landing means the aeroplanes touch down four
+ * kilometres east of the village and stop, which is not something you can see from the beer
+ * garden, and the chip must not imply otherwise.
+ */
+function runwayInUse(runway: string, role: Role, landing: string[], departing: string[]): boolean {
+  return role === 'arrivals' ? landing.includes(runway) : departing.includes(runway);
 }
 
-function runwayTitle(runway: string, landing: string[], departing: string[]): string {
-  if (landing.includes(runway)) return `${runway} is landing traffic right now`;
-  if (departing.includes(runway)) return `${runway} is departing traffic right now`;
-  return `${runway} is not in use in the current configuration`;
+function runwayTone(runway: string, role: Role, landing: string[], departing: string[]): Tone {
+  if (!runwayInUse(runway, role, landing, departing)) return 'neutral';
+  return role === 'arrivals' ? 'arrival' : 'departure';
+}
+
+function runwayTitle(runway: string, role: Role, landing: string[], departing: string[]): string {
+  if (runwayInUse(runway, role, landing, departing)) {
+    return role === 'arrivals'
+      ? `${runway} is landing right now, and its approach passes this spot`
+      : `${runway} is departing right now, and its departures pass this spot`;
+  }
+  return role === 'arrivals'
+    ? `${runway} is not landing in the current configuration`
+    : `${runway} is not departing in the current configuration`;
 }
 
 /** Colour alone must not carry the "in use" fact, so the live runways say so in words too. */
-function runwayChipLabel(runway: string, landing: string[], departing: string[]): string {
-  if (landing.includes(runway)) return `${runway} · landing`;
-  if (departing.includes(runway)) return `${runway} · departing`;
-  return runway;
+function runwayChipLabel(runway: string, role: Role, landing: string[], departing: string[]): string {
+  if (!runwayInUse(runway, role, landing, departing)) return runway;
+  return role === 'arrivals' ? `${runway} · landing now` : `${runway} · departing now`;
 }
 
 function Detail(p: { term: string; children: ReactElement | string }): ReactElement {
@@ -107,6 +134,11 @@ function Detail(p: { term: string; children: ReactElement | string }): ReactElem
       <dd>{p.children}</dd>
     </div>
   );
+}
+
+/** DOM id for a spot's card, so the tab can scroll the one the map pointed at into view. */
+export function spotCardDomId(spotId: string): string {
+  return `spot-card-${spotId}`;
 }
 
 export function SpotCard(p: {
@@ -127,13 +159,24 @@ export function SpotCard(p: {
   const walk = formatWalk(evaluation.distanceKm, units);
   const leadReason = reasons[0] ?? null;
   const ratingWord = RATING_WORDS[rating] ?? 'Unrated';
+  const sees = seesOf(spot);
+  const airside = spot.accessType === 'airside';
+  const roles: Array<{ role: Role; title: string; runways: string[] }> = [
+    { role: 'arrivals', title: 'Arrivals', runways: spot.arrivalsFor },
+    { role: 'departures', title: 'Departures', runways: spot.departuresFor },
+  ];
 
-  const showOnMap = (): void => {
-    window.location.hash = '#map';
-  };
+  // Carry the spot with us: the map opens on this pin with its card up, rather than on eleven
+  // identical pins and no clue which one was asked for.
+  const showOnMap = (): void => navigateTo('map', spot.id);
 
   return (
-    <Card as="li" className={expanded ? 'spot spot--open' : 'spot'} accent={RATING_ACCENTS[rating]}>
+    <Card
+      as="li"
+      id={spotCardDomId(spot.id)}
+      className={expanded ? 'spot spot--open' : 'spot'}
+      accent={RATING_ACCENTS[rating]}
+    >
       {/* Disclosure pattern: the summary is the heading, the heading is the button. */}
       <h3 className="spot-heading">
         <button
@@ -161,7 +204,16 @@ export function SpotCard(p: {
               <Chip tone={LIGHT_TONES[light] ?? 'neutral'} size="sm" title={lightMeaning(light)}>
                 {lightLabel(light)}
               </Chip>
-              <Chip size="sm">{SEES_CHIPS[spot.sees] ?? 'What it sees is unrecorded'}</Chip>
+              <Chip size="sm">{SEES_CHIPS[sees]}</Chip>
+              {airside ? (
+                <Chip
+                  tone="warn"
+                  size="sm"
+                  title="Past security in Terminal 4 — there is no landside way in"
+                >
+                  Airside only
+                </Chip>
+              ) : null}
               {walk ? (
                 <Chip size="sm" title="Straight-line distance from your device's location">
                   {walk}
@@ -209,34 +261,45 @@ export function SpotCard(p: {
 
             <div className="spot-block">
               <h4 className="spot-block-title">Runways it works for</h4>
-              {spot.goodFor.length > 0 ? (
+              {sees === 'none' ? (
+                <p className="spot-plain">No specific runways are recorded for this spot.</p>
+              ) : (
                 <>
-                  <ul className="spot-runways">
-                    {spot.goodFor.map((runway) => (
-                      <li key={runway}>
-                        <Chip
-                          tone={runwayTone(runway, landing, departing)}
-                          size="sm"
-                          title={runwayTitle(runway, landing, departing)}
-                        >
-                          {runwayChipLabel(runway, landing, departing)}
-                        </Chip>
-                      </li>
-                    ))}
-                  </ul>
+                  {roles.map((entry) =>
+                    entry.runways.length === 0 ? null : (
+                      <div className="spot-runway-role" key={entry.role}>
+                        <span className="spot-runway-role-name">{entry.title}</span>
+                        <ul className="spot-runways">
+                          {entry.runways.map((runway) => (
+                            <li key={runway}>
+                              <Chip
+                                tone={runwayTone(runway, entry.role, landing, departing)}
+                                size="sm"
+                                title={runwayTitle(runway, entry.role, landing, departing)}
+                              >
+                                {runwayChipLabel(runway, entry.role, landing, departing)}
+                              </Chip>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ),
+                  )}
                   <p className="spot-plain">
-                    Runways marked landing or departing are the ones Heathrow is actually using
-                    right now; the rest are what this spot covers when the airport turns around.
+                    Each runway is listed under the movement you can watch from here — the
+                    approach and the climb-out are at opposite ends of the same strip of concrete.
+                    The ones marked "now" are what Heathrow is using this minute.
                   </p>
                 </>
-              ) : (
-                <p className="spot-plain">No specific runways are recorded for this spot.</p>
               )}
             </div>
 
             <dl className="spot-facts">
-              <Detail term="What you'll see">
-                {SEES_SENTENCES[spot.sees] ?? 'What this spot sees is not recorded.'}
+              <Detail term="What you'll see">{SEES_SENTENCES[sees]}</Detail>
+              <Detail term="Getting in">
+                {airside
+                  ? 'Airside — past security in Terminal 4, so only on a day you are flying.'
+                  : 'Public — a street, verge or free viewing area, open to anyone.'}
               </Detail>
               <Detail term="Looking">
                 {`${compassPoint(spot.viewBearing)} · ${Math.round(spot.viewBearing)}° true`}

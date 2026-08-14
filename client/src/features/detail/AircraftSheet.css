@@ -414,12 +414,24 @@
 /* ---- Footer action -------------------------------------------------------------------- */
 
 .det-actions {
+  position: relative;
   flex: none;
   display: flex;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5) calc(var(--space-3) + var(--safe-bottom));
   border-top: 1px solid var(--line);
   background: var(--surface-1);
+}
+
+/* Content is cut by the scroll boundary; fade it out so the cut reads as "more below". */
+.det-actions::before {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: var(--space-5);
+  pointer-events: none;
+  background: linear-gradient(to top, var(--surface-1), transparent);
 }
 
 .det-action {

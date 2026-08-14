@@ -8,7 +8,9 @@
  */
 
 .map-tab {
-  --map-plane-edge: color-mix(in srgb, var(--text) 62%, transparent);
+  /* The keyline that separates an airline's brand colour from whatever tile is behind it.
+     At 62% a dark livery on a dark plate read as a smudge; it has to carry the silhouette. */
+  --map-plane-edge: color-mix(in srgb, var(--text) 88%, transparent);
   --map-glass: var(--surface-glass);
   /* Vertical room kept clear at the bottom for the tile attribution. */
   --map-credit-clear: 42px;
@@ -31,7 +33,12 @@
     100dvh - var(--app-topbar-height, var(--header-height)) - var(--nav-height) -
       var(--safe-bottom)
   );
-  min-height: 60dvh;
+  /*
+   * A floor, not a target: at 60dvh this outgrew the space between the topbar and the tab bar
+   * on a phone and pushed the tile attribution — which we are required to show — underneath
+   * the navigation. Only a landscape phone ever hits this value.
+   */
+  min-height: 260px;
 }
 
 .map-canvas {
@@ -141,12 +148,44 @@
 }
 
 .map-plane,
-.map-plane-halo {
+.map-plane-halo,
+.map-plane-badge {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   pointer-events: none;
+}
+
+/*
+ * Arriving or departing, said in shape as well as in hue: the glow is a colour-only channel, and
+ * the board makes the same distinction with a rotated icon plus a text chip.
+ */
+.map-marker--arrival .map-plane-badge::after,
+.map-marker--departure .map-plane-badge::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  width: 9px;
+  height: 7px;
+}
+
+.map-marker--arrival .map-plane-badge::after {
+  /* Pointing down: coming in. */
+  background: var(--arrival);
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+
+.map-marker--departure .map-plane-badge::after {
+  /* Pointing up: on the way out. */
+  background: var(--departure);
+  clip-path: polygon(50% 0, 0 100%, 100% 100%);
+}
+
+/* An aeroplane on the tarmac is doing neither, so it carries no chevron at all. */
+.map-marker--onground .map-plane-badge::after {
+  display: none;
 }
 
 .map-plane {
@@ -191,13 +230,14 @@
 
 .map-marker--ground .map-plane-body,
 .map-marker--onground .map-plane-body {
-  opacity: 0.68;
-  stroke-width: 1.2;
+  opacity: 0.85;
+  stroke-width: 1.4;
 }
 
+/* No coloured glow on the ground — but still a shadow, or a parked whale vanishes into the plate. */
 .map-marker--ground .map-plane-art,
 .map-marker--onground .map-plane-art {
-  filter: none;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--bg) 85%, transparent));
 }
 
 .map-marker--world .map-plane-body {
@@ -400,7 +440,7 @@
 
 /* ---- Chrome: status, controls, legend, overlays ---------------------------------- */
 
-.map-status,
+.map-topleft,
 .map-controls,
 .map-legend,
 .map-overlay {
@@ -408,10 +448,41 @@
   z-index: 1;
 }
 
-.map-status {
+/* The top-left stack: live status, then anything that needs to be said about the map itself. */
+.map-topleft {
   top: var(--space-3);
   left: var(--space-3);
-  max-width: min(24rem, calc(100% - var(--tap-target) - var(--space-8)));
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  max-width: min(26rem, calc(100% - var(--tap-target) - var(--space-8)));
+}
+
+.map-basemap-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--map-glass);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.map-basemap-note .ui-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+.map-status {
+  max-width: 100%;
   /* Wide enough that a ticking "updated 4 s ago" never resizes the pill. */
   min-width: min(100%, 13rem);
   padding: var(--space-2) var(--space-3);
@@ -546,8 +617,8 @@
 .map-legend-summary {
   display: flex;
   align-items: center;
-  min-height: 36px;
-  padding: 0 var(--space-3);
+  min-height: var(--tap-target);
+  padding: 0 var(--space-4);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-caps);
@@ -603,21 +674,44 @@
   border-radius: var(--radius-xs);
 }
 
-.map-swatch--arrival {
-  background: var(--arrival);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--arrival) 70%, transparent);
+/*
+ * The aircraft swatches are glows around a neutral body, because that is what the map draws: the
+ * planform carries the airline's brand colour and the drop-shadow carries the role. A solid teal
+ * square told the reader to look for teal aeroplanes, and there are none.
+ */
+.map-swatch--glow-arrival,
+.map-swatch--glow-departure,
+.map-swatch--glow-ground,
+.map-swatch--glow-world {
+  width: 10px;
+  height: 10px;
+  margin: 2px;
+  border-radius: var(--radius-full);
+  background: var(--text-secondary);
 }
 
-.map-swatch--departure {
-  background: var(--departure);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--departure) 70%, transparent);
+.map-swatch--glow-arrival {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--arrival) 60%, transparent),
+    0 0 7px color-mix(in srgb, var(--arrival) 75%, transparent);
 }
 
-.map-swatch--ground {
+.map-swatch--glow-departure {
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--departure) 60%, transparent),
+    0 0 7px color-mix(in srgb, var(--departure) 75%, transparent);
+}
+
+.map-swatch--glow-ground {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+.map-swatch--glow-world {
   background: var(--text-muted);
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
+/* The runway rows do match their lines exactly — and now they differ in pattern, not only hue. */
 .map-swatch--landing {
   height: 6px;
   border-radius: var(--radius-full);
@@ -627,7 +721,11 @@
 .map-swatch--departing {
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--departure);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--departure) 0 3px,
+    transparent 3px 6px
+  );
 }
 
 .map-swatch--spot {
@@ -707,12 +805,12 @@
     border-block: 0;
   }
 
-  .map-status,
+  .map-topleft,
   .map-controls {
     top: var(--space-4);
   }
 
-  .map-status {
+  .map-topleft {
     left: var(--space-4);
   }
 

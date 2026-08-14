@@ -3,14 +3,19 @@
   background: color-mix(in srgb, var(--surface-1) 70%, transparent);
 }
 
+/*
+ * Four cells will not fit legibly across a 390px phone — at that width every label and caption
+ * clipped mid-word. Two columns of two is the honest layout there, four across from 560px.
+ */
 .strip-inner {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
   width: 100%;
   max-width: var(--max-width);
   margin-inline: auto;
-  padding: var(--space-3) var(--space-4);
+  /* Two rows of chrome above the hero: keep them tight so the countdown stays high. */
+  padding: var(--space-2) var(--space-4);
 }
 
 .strip-cell {
@@ -29,11 +34,12 @@
   background: var(--line-strong);
 }
 
-.strip-cell:first-child {
+/* In the two-column layout the rule belongs on the second cell of each row, not the first. */
+.strip-cell:nth-child(odd) {
   padding-inline-start: 0;
 }
 
-.strip-cell:first-child::before {
+.strip-cell:nth-child(odd)::before {
   display: none;
 }
 
@@ -54,11 +60,28 @@
 
 @media (min-width: 560px) {
   .strip-inner {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-4);
-    padding-inline: var(--space-5);
+    padding: var(--space-3) var(--space-5);
   }
 
   .strip-cell {
     padding-inline-start: var(--space-4);
+  }
+
+  .strip-cell:nth-child(odd) {
+    padding-inline-start: var(--space-4);
+  }
+
+  .strip-cell:nth-child(odd)::before {
+    display: block;
+  }
+
+  .strip-cell:first-child {
+    padding-inline-start: 0;
+  }
+
+  .strip-cell:first-child::before {
+    display: none;
   }
 }

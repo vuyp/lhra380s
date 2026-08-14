@@ -37,3 +37,17 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/*
+ * In the roomy fact grids (hero, detail sheet) a caption like "predicted · high confidence" is
+ * worth two lines rather than an ellipsis. The box is reserved at two lines so a caption that
+ * grows or shrinks with the data cannot move anything underneath it.
+ */
+.ui-stat--wrap .ui-stat-sub {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 2.7em;
+  white-space: normal;
+  overflow-wrap: break-word;
+}

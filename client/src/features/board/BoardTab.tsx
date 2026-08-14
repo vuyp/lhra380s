@@ -61,9 +61,32 @@ function pickNextWhale(arrivals: Movement[]): Movement | null {
     }
   }
 
-  // A real ETA wins; then the closest; then anything still flying; then whatever the server
-  // put first, which will be a flight that has just landed.
+  // A real ETA wins; then the closest; then anything still flying. The final fallback is only
+  // reached when the arrivals list holds nothing airborne at all, which the server's own
+  // `kindForPhase` makes rare — landed and parked aircraft go to the ground list, not this one.
   return soonest ?? closest ?? anyAirborne ?? arrivals[0] ?? null;
+}
+
+/** How long a whale that has just touched down stays in the hero before it gives way. */
+const JUST_LANDED_MS = 2 * 60_000;
+
+/**
+ * The whale that landed a moment ago.
+ *
+ * Someone who has just watched one come over the fence wants the hero to say "Touched down 20:01
+ * · 27L" for a minute or two, not to blank straight to the idle panel. The arrivals list cannot
+ * supply this — a landed aircraft is `ground` on the wire — so the hero is handed one from there.
+ */
+function pickJustLanded(ground: Movement[], now: number): Movement | null {
+  let best: Movement | null = null;
+  for (const movement of ground) {
+    if (movement.phase !== 'landed') continue;
+    const at = movement.actualAt;
+    if (at === null || !Number.isFinite(at)) continue;
+    if (at > now || now - at > JUST_LANDED_MS) continue;
+    if (best === null || at > (best.actualAt ?? 0)) best = movement;
+  }
+  return best;
 }
 
 function describeNewArrival(movement: Movement): string {
@@ -117,7 +140,10 @@ function Section(p: {
       </h2>
 
       {movements.length === 0 ? (
-        <p className="board-none">{empty}</p>
+        <p className="board-none">
+          <Icon name={icon} size={16} className="board-none-icon" />
+          <span>{empty}</span>
+        </p>
       ) : (
         <ul className="board-list">
           {movements.map((movement) => (
@@ -144,13 +170,20 @@ function BoardSkeleton(): ReactElement {
 /* ---- Tab ------------------------------------------------------------------------ */
 
 export function BoardTab(): ReactElement {
-  const { snapshot, connected, lastUpdate } = useSnapshot();
+  const { snapshot, connected, lastUpdate, fromCache } = useSnapshot();
   const now = useNow(1000);
   const [filter, setFilter] = useState<Filter>('all');
 
   const arrivals = snapshot?.arrivals ?? null;
+  const ground = snapshot?.ground ?? null;
   const announcement = useArrivalAnnouncement(arrivals);
-  const next = useMemo(() => (arrivals ? pickNextWhale(arrivals) : null), [arrivals]);
+  // Coarse, so the "just landed" window expires without re-running this every second.
+  const landedBucket = Math.floor(now / 10_000);
+  const next = useMemo(() => {
+    const inbound = arrivals ? pickNextWhale(arrivals) : null;
+    if (inbound) return inbound;
+    return ground ? pickJustLanded(ground, landedBucket * 10_000) : null;
+  }, [arrivals, ground, landedBucket]);
 
   if (!snapshot) {
     return (
@@ -165,7 +198,10 @@ export function BoardTab(): ReactElement {
 
   const showArrivals = filter === 'all' || filter === 'arrivals';
   const showDepartures = filter === 'all' || filter === 'departures';
-  const feedTrouble = !connected || snapshot.health.stale;
+  // A dropped browser stream is not a quiet Heathrow feed. Blaming the upstream poller for this
+  // device's reconnect told the reader the wrong thing about the wrong system.
+  const feedQuiet = snapshot.health.stale;
+  const reconnecting = !connected && !feedQuiet && !fromCache;
 
   return (
     <div className="board">
@@ -178,11 +214,27 @@ export function BoardTab(): ReactElement {
           onChange={setFilter}
           ariaLabel="Filter the board"
         />
-        {feedTrouble ? (
-          <Chip tone="warn" size="sm" title="Positions are held until the feed recovers">
+        {feedQuiet ? (
+          <Chip tone="warn" size="sm" title="Positions are held until the Heathrow feed recovers">
             {snapshot.health.lastPollAt === null
               ? 'Feed unavailable'
               : `Feed quiet · last data ${formatClock(snapshot.health.lastPollAt)}`}
+          </Chip>
+        ) : fromCache ? (
+          <Chip
+            tone="warn"
+            size="sm"
+            title="The server cannot be reached; this is the copy your browser saved"
+          >
+            Offline · cached from {formatClock(lastUpdate ?? snapshot.ts)}
+          </Chip>
+        ) : reconnecting ? (
+          <Chip
+            tone="warn"
+            size="sm"
+            title="This device lost the live stream; the data below is the last update it received"
+          >
+            Reconnecting · last update {formatClock(lastUpdate ?? snapshot.ts)}
           </Chip>
         ) : (
           <span className="board-updated app-numeric">
@@ -202,7 +254,7 @@ export function BoardTab(): ReactElement {
           tone="arrival"
           movements={snapshot.arrivals}
           now={now}
-          empty="No A380 is inbound to Heathrow at the moment. The board fills itself the moment one turns for London — nothing here is scheduled or guessed."
+          empty="Nothing inbound. Arrivals appear here the moment an A380 turns for London — nothing on this board is scheduled or guessed."
         />
       ) : null}
 
@@ -213,7 +265,7 @@ export function BoardTab(): ReactElement {
           tone="departure"
           movements={snapshot.departures}
           now={now}
-          empty="Nothing pushing back or rolling right now. Departures appear once an A380 starts moving at Heathrow."
+          empty="Nothing pushing back or rolling. Departures appear once an A380 starts moving on the ground at Heathrow."
         />
       ) : null}
 
@@ -224,7 +276,7 @@ export function BoardTab(): ReactElement {
           tone="neutral"
           movements={snapshot.ground}
           now={now}
-          empty="No A380 is parked at Heathrow right now."
+          empty="No A380 is parked at Heathrow right now — none of the fleet is on a stand or taxiing."
         />
       ) : null}
     </div>

@@ -76,6 +76,32 @@ function readJson(fileName: string): unknown {
   }
 }
 
+/**
+ * Read a file that must hold a JSON array, warning if it holds something else. A file that parses
+ * but is the wrong shape is the dangerous case: it degrades exactly like a missing one, but
+ * silently, and the only symptom is an app where every airframe is suddenly "unknown".
+ */
+function readJsonArray(fileName: string): unknown[] | null {
+  const raw = readJson(fileName);
+  if (raw === null) return null;
+  if (!Array.isArray(raw)) {
+    log.warn(`reference: ${fileName} is not a JSON array — ignoring it`);
+    return null;
+  }
+  return raw;
+}
+
+/** Read a file that must hold a JSON object keyed by code, warning if it holds something else. */
+function readJsonObject(fileName: string): Record<string, unknown> | null {
+  const raw = readJson(fileName);
+  if (raw === null) return null;
+  if (!isRecord(raw)) {
+    log.warn(`reference: ${fileName} is not a JSON object — ignoring it`);
+    return null;
+  }
+  return raw;
+}
+
 /* ------------------------------------------------------------------ *
  * data/airport.json
  * ------------------------------------------------------------------ */
@@ -127,8 +153,11 @@ function parseBoundary(value: unknown): Array<[number, number]> {
 }
 
 function loadAirport(): AirportRef {
-  const raw = readJson('airport.json');
-  if (!isRecord(raw)) return FALLBACK_AIRPORT;
+  const raw = readJsonObject('airport.json');
+  if (raw === null) {
+    log.warn('reference: falling back to the built-in EGLL constants from SPEC.md §5');
+    return FALLBACK_AIRPORT;
+  }
 
   const lat = num(raw['lat']);
   const lon = num(raw['lon']);
@@ -171,8 +200,8 @@ interface AirlineRow {
 
 function loadAirlines(): Map<string, AirlineRow> {
   const out = new Map<string, AirlineRow>();
-  const raw = readJson('airlines.json');
-  if (!isRecord(raw)) return out;
+  const raw = readJsonObject('airlines.json');
+  if (raw === null) return out;
   for (const [code, value] of Object.entries(raw)) {
     const icao = str(code);
     if (icao === null || !isRecord(value)) continue;
@@ -229,8 +258,8 @@ function loadFleet(): FleetIndex {
     operatorsByPrefix: new Map(),
   };
 
-  const raw = readJson('fleet.json');
-  if (!Array.isArray(raw)) return index;
+  const raw = readJsonArray('fleet.json');
+  if (raw === null) return index;
 
   for (const item of raw) {
     if (!isRecord(item)) continue;
@@ -271,8 +300,8 @@ const FLEET: FleetIndex = loadFleet();
 
 function loadPlaces(): Map<string, Place> {
   const out = new Map<string, Place>();
-  const raw = readJson('places.json');
-  if (!isRecord(raw)) return out;
+  const raw = readJsonObject('places.json');
+  if (raw === null) return out;
   for (const [code, value] of Object.entries(raw)) {
     const icao = str(code)?.toUpperCase() ?? null;
     if (icao === null || !isRecord(value)) continue;
@@ -299,8 +328,8 @@ interface RouteRow {
 
 function loadRoutes(): Map<string, RouteRow> {
   const out = new Map<string, RouteRow>();
-  const raw = readJson('routes.json');
-  if (!Array.isArray(raw)) return out;
+  const raw = readJsonArray('routes.json');
+  if (raw === null) return out;
   for (const item of raw) {
     if (!isRecord(item)) continue;
     const callsign = str(item['callsign'])?.toUpperCase().replace(/\s+/g, '') ?? null;
@@ -321,14 +350,25 @@ const ROUTES: Map<string, RouteRow> = loadRoutes();
  * data/spots.json
  * ------------------------------------------------------------------ */
 
-function parseSees(value: unknown): SpotLocation['sees'] {
-  const text = str(value)?.toLowerCase();
-  return text === 'arrivals' || text === 'departures' ? text : 'both';
+function parseAccessType(value: unknown): SpotLocation['accessType'] {
+  // Anything not positively marked airside is treated as public — the failure mode of guessing
+  // wrong here is telling someone a spot needs a boarding pass when it does not, which is far
+  // less costly than the reverse.
+  return str(value)?.toLowerCase() === 'airside' ? 'airside' : 'public';
+}
+
+/** A list of runway designators, normalised. Anything unreadable is dropped, never guessed. */
+function parseRunwayList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    const designator = str(entry);
+    return designator === null ? [] : [designator.toUpperCase()];
+  });
 }
 
 function loadSpots(): SpotLocation[] {
-  const raw = readJson('spots.json');
-  if (!Array.isArray(raw)) return [];
+  const raw = readJsonArray('spots.json');
+  if (raw === null) return [];
 
   const out: SpotLocation[] = [];
   for (const item of raw) {
@@ -339,13 +379,6 @@ function loadSpots(): SpotLocation[] {
     const lon = num(item['lon']);
     if (id === null || name === null || lat === null || lon === null) continue;
 
-    const goodFor = Array.isArray(item['goodFor'])
-      ? item['goodFor'].flatMap((entry) => {
-          const designator = str(entry);
-          return designator === null ? [] : [designator.toUpperCase()];
-        })
-      : [];
-
     out.push(
       Object.freeze({
         id,
@@ -353,8 +386,9 @@ function loadSpots(): SpotLocation[] {
         tagline: str(item['tagline']) ?? '',
         lat,
         lon,
-        goodFor,
-        sees: parseSees(item['sees']),
+        arrivalsFor: parseRunwayList(item['arrivalsFor']),
+        departuresFor: parseRunwayList(item['departuresFor']),
+        accessType: parseAccessType(item['accessType']),
         viewBearing: ((num(item['viewBearing']) ?? 0) % 360 + 360) % 360,
         access: str(item['access']) ?? '',
         notes: str(item['notes']) ?? '',

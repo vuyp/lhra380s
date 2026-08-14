@@ -8,6 +8,23 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * The elements inside `root` that Tab will actually stop on, in order.
+ *
+ * The `tabIndex >= 0` test is what makes this a focus trap rather than a decoration. A roving
+ * tabindex — which the segmented controls inside the settings sheet use — leaves every unselected
+ * option as a `<button tabindex="-1">`, and those still match the selector above. Counting them
+ * meant `last` was an element Tab could never reach, the wrap at the end never fired, and Tab
+ * walked straight out of an `aria-modal` dialog into the page behind the scrim.
+ */
+export function collectTabbable(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (element) =>
+      element.tabIndex >= 0 &&
+      (element.offsetParent !== null || element === document.activeElement),
+  );
+}
+
+/**
  * A modal bottom sheet on phones, a centred dialog from 720px up.
  * Traps focus, closes on Escape and on backdrop press, restores focus on the way out.
  */
@@ -38,9 +55,7 @@ export function Sheet(p: {
 
     const panel = panelRef.current;
     if (!panel) return;
-    const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
-      (element) => element.offsetParent !== null || element === document.activeElement,
-    );
+    const items = collectTabbable(panel);
     if (items.length === 0) {
       event.preventDefault();
       panel.focus();

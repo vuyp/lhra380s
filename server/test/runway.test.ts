@@ -34,6 +34,7 @@ function aircraft(partial: Partial<UpstreamAircraft>): UpstreamAircraft {
     lon: partial.lon ?? null,
     altitude: partial.altitude ?? null,
     onGround: partial.onGround ?? false,
+    groundKnown: partial.groundKnown ?? true,
     groundSpeed: partial.groundSpeed ?? null,
     track: partial.track ?? null,
     verticalRate: partial.verticalRate ?? null,
@@ -518,7 +519,9 @@ test('predictArrivalRunway never throws', () => {
 test('a single departure runway is reported with the config’s own confidence', () => {
   const prediction = predictDepartureRunway(westerlyConfig(['27R'], ['27L'], 0.82));
   assert.equal(prediction.runway, '27L');
-  assert.equal(prediction.source, 'observed');
+  // However well the traffic agreed, no geometry was read from THIS aeroplane: a configuration
+  // is an inference about the airport, never an observation of a departure.
+  assert.equal(prediction.source, 'inferred');
   assert.equal(prediction.confidence, 0.82);
 });
 

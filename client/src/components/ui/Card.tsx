@@ -8,6 +8,8 @@ interface CardProps {
   onClick?: () => void;
   className?: string;
   as?: 'div' | 'article' | 'li';
+  /** DOM id, when something outside needs to scroll to or link at this card. */
+  id?: string;
 }
 
 function accentStyle(accent: string | undefined): CSSProperties | undefined {
@@ -16,7 +18,7 @@ function accentStyle(accent: string | undefined): CSSProperties | undefined {
 }
 
 export function Card(p: CardProps): ReactElement {
-  const { children, accent, onClick, className, as = 'div' } = p;
+  const { children, accent, onClick, className, as = 'div', id } = p;
 
   const classes = ['ui-card'];
   if (accent) classes.push('ui-card--accented');
@@ -38,13 +40,13 @@ export function Card(p: CardProps): ReactElement {
   if (as === 'li') {
     if (!onClick) {
       return (
-        <li className={classes.join(' ')} style={accentStyle(accent)}>
+        <li className={classes.join(' ')} style={accentStyle(accent)} id={id}>
           {children}
         </li>
       );
     }
     return (
-      <li className="ui-card-item">
+      <li className="ui-card-item" id={id}>
         <div className={classes.join(' ')} style={accentStyle(accent)} {...interactiveProps}>
           {children}
         </div>
@@ -54,7 +56,7 @@ export function Card(p: CardProps): ReactElement {
 
   const Element = as;
   return (
-    <Element className={classes.join(' ')} style={accentStyle(accent)} {...interactiveProps}>
+    <Element className={classes.join(' ')} style={accentStyle(accent)} id={id} {...interactiveProps}>
       {children}
     </Element>
   );

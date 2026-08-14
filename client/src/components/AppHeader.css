@@ -15,15 +15,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   min-height: var(--header-height);
 }
 
 .hdr-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  /* Shrinks before the controls do, and can never spill over them. */
+  flex: 0 1 auto;
   min-width: 0;
+  min-height: var(--tap-target);
+  overflow: hidden;
   color: var(--text);
   text-decoration: none;
   border-radius: var(--radius-sm);
@@ -33,8 +37,8 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--brand-cyan) 14%, var(--surface-2));
   color: var(--brand-cyan);
@@ -43,7 +47,7 @@
 .hdr-wordmark {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: 6px;
   min-width: 0;
 }
 
@@ -52,9 +56,18 @@
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/*
+ * The airport badge is a duplicate: the ops row under it, the status strip and the page title
+ * all say Heathrow. On a phone it was the 13px that pushed the wordmark into an ellipsis and
+ * shoved the LIVE pill on top of it, so it earns its place only where there is room for it.
+ */
 .hdr-wordmark-airport {
+  display: none;
+  flex: none;
   padding: 1px var(--space-2);
   border: 1px solid var(--line-accent);
   border-radius: var(--radius-xs);
@@ -67,6 +80,7 @@
 .hdr-actions {
   display: flex;
   align-items: center;
+  flex: none;
   gap: var(--space-1);
 }
 
@@ -93,7 +107,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-full);
   background: var(--surface-2);
@@ -102,6 +116,7 @@
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
+
 
 .hdr-dot-mark {
   width: 7px;
@@ -117,6 +132,15 @@
 
 .hdr-dot--live .hdr-dot-mark {
   animation: hdr-breathe 2.4s var(--ease) infinite;
+}
+
+.hdr-dot--waiting {
+  color: var(--text-secondary);
+  border-color: var(--line-strong);
+}
+
+.hdr-dot--waiting .hdr-dot-mark {
+  animation: hdr-breathe 1.6s var(--ease) infinite;
 }
 
 .hdr-dot--down {
@@ -153,8 +177,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-3);
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: linear-gradient(
@@ -167,7 +191,8 @@
 .hdr-ops-block {
   display: flex;
   flex: 1 1 auto;
-  align-items: center;
+  /* The icon sits on the first line of the text, not floating in the middle of a wrapped block. */
+  align-items: flex-start;
   gap: var(--space-3);
   min-width: 0;
 }
@@ -176,6 +201,7 @@
   display: grid;
   place-items: center;
   flex: none;
+  height: 1.5em;
   color: var(--brand-cyan);
 }
 
@@ -186,6 +212,18 @@
   gap: var(--space-1) var(--space-4);
   min-width: 0;
   font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+/* On a phone the direction owns its own line so the two runway pairs stay side by side. */
+.hdr-ops-lead {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex: 1 0 100%;
+  min-width: 0;
+  /* Tall enough for the confidence chip, so its arrival changes glyphs and not geometry. */
+  min-height: 24px;
 }
 
 .hdr-ops-direction {
@@ -226,9 +264,14 @@
 
 .hdr-ops-text--unknown {
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
   font-weight: var(--weight-semibold);
   color: var(--text);
+}
+
+.hdr-ops-text--unknown .hdr-ops-lead {
+  flex: 0 0 auto;
 }
 
 .hdr-ops-note {
@@ -280,6 +323,13 @@
   --hdr-banner-bg: color-mix(in srgb, var(--warning) 12%, transparent);
   --hdr-banner-line: color-mix(in srgb, var(--warning) 34%, transparent);
   --hdr-banner-fg: var(--warning);
+}
+
+/* Still connecting is not a fault, and must not be dressed as one. */
+.hdr-banner--connecting {
+  --hdr-banner-bg: color-mix(in srgb, var(--surface-3) 70%, transparent);
+  --hdr-banner-line: var(--line);
+  --hdr-banner-fg: var(--text-secondary);
 }
 
 .hdr-banner--offline {
@@ -341,11 +391,21 @@
   cursor: pointer;
 }
 
+/* 52 × 30 of switch inside a full 44px-tall hit area — the track is painted, not the box. */
 .hdr-switch {
   position: relative;
   flex: none;
   width: 52px;
-  height: 30px;
+  height: var(--tap-target);
+  border-radius: var(--radius-full);
+  background: none;
+}
+
+.hdr-switch::before {
+  content: '';
+  position: absolute;
+  inset-block: 7px;
+  inset-inline: 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-full);
   background: var(--surface-3);
@@ -356,8 +416,8 @@
 
 .hdr-switch-knob {
   position: absolute;
-  top: 3px;
-  left: 3px;
+  top: 11px;
+  left: 4px;
   width: 22px;
   height: 22px;
   border-radius: var(--radius-full);
@@ -367,7 +427,7 @@
     background-color var(--dur) var(--ease);
 }
 
-.hdr-switch--on {
+.hdr-switch--on::before {
   background: color-mix(in srgb, var(--brand-cyan) 34%, transparent);
   border-color: var(--line-accent);
 }
@@ -381,6 +441,35 @@
   opacity: 0.5;
 }
 
+@media (min-width: 480px) {
+  .hdr-top {
+    gap: var(--space-3);
+  }
+
+  .hdr-dot {
+    padding-inline: var(--space-3);
+  }
+
+  .hdr-brand {
+    gap: var(--space-3);
+  }
+
+  .hdr-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .hdr-wordmark-airport {
+    display: inline-block;
+  }
+}
+
+@media (min-width: 560px) {
+  .hdr-ops-lead {
+    flex: 0 0 auto;
+  }
+}
+
 @media (min-width: 720px) {
   .hdr-inner {
     padding-inline: var(--space-5);
@@ -389,7 +478,12 @@
   .hdr-ops {
     flex-wrap: nowrap;
     justify-content: space-between;
+    align-items: center;
     padding: var(--space-3) var(--space-4);
+  }
+
+  .hdr-ops-block {
+    align-items: center;
   }
 
   .hdr-ops-text {

@@ -1,7 +1,7 @@
 .ui-seg {
   display: inline-flex;
   gap: 2px;
-  padding: 3px;
+  padding: 2px;
   border: 1px solid var(--line);
   border-radius: var(--radius-full);
   background: var(--surface-1);
@@ -9,7 +9,8 @@
 
 .ui-seg-option {
   flex: 1 1 auto;
-  min-height: calc(var(--tap-target) - 8px);
+  /* A full 44px target: this is pressed one-handed, outdoors, in gloves. */
+  min-height: var(--tap-target);
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
   font-size: var(--text-sm);

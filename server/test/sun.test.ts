@@ -186,6 +186,35 @@ test('sunInfo assembles the wire contract and flags golden hour honestly', () =>
   closeBearing(noon.azimuth, 180, 0.5, 'noon azimuth');
 });
 
+test('the golden hour ends where the sun leaves the band, not at the far end of the day', () => {
+  const times = sunTimes(new Date(Date.UTC(2026, 7, 14, 12)), LAT, LON);
+  assert.ok(times.sunrise !== null && times.sunset !== null);
+
+  // Morning: it ends when the sun climbs past +8°, within an hour or so of sunrise — NOT at
+  // sunset, which is what reading `isDaylight ? sunsetAt : sunriseAt` gave (13 hours out).
+  const morning = sunInfo(times.sunrise + 10 * MINUTE, LAT, LON);
+  assert.equal(morning.goldenHour, true);
+  assert.ok(morning.goldenUntil !== null, 'a golden hour in progress must say when it ends');
+  const morningEnd = morning.goldenUntil ?? 0;
+  assert.ok(morningEnd > times.sunrise, 'the morning golden hour cannot end before sunrise');
+  assert.ok(
+    morningEnd < times.sunrise + 2 * 3_600_000,
+    `morning golden hour ran to ${new Date(morningEnd).toISOString()}`,
+  );
+  assert.equal(sunInfo(morningEnd + 2 * MINUTE, LAT, LON).goldenHour, false);
+  assert.equal(sunInfo(morningEnd - 2 * MINUTE, LAT, LON).goldenHour, true);
+
+  // Evening: it runs past sunset, down to -4°, which is the other half of the same honesty.
+  const evening = sunInfo(times.sunset - 10 * MINUTE, LAT, LON);
+  assert.equal(evening.goldenHour, true);
+  const eveningEnd = evening.goldenUntil ?? 0;
+  assert.ok(eveningEnd > times.sunset, 'golden light does not stop at sunset');
+  assert.ok(eveningEnd < times.sunset + 60 * MINUTE);
+
+  // No golden hour, no claim about one.
+  assert.equal(sunInfo(solarNoon(2026, 7, 14), LAT, LON).goldenUntil, null);
+});
+
 test('sunInfo agrees with sunPosition and rounds cleanly', () => {
   const now = Date.UTC(2026, 5, 21, 15, 30);
   const info = sunInfo(now, LAT, LON);

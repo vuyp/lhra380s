@@ -277,17 +277,39 @@ describe('data/spots.json', () => {
       }
       assert.ok(spot.transport === null || spot.transport.length > 0);
       assert.ok(spot.facilities === null || spot.facilities.length > 0);
-      assert.ok(['arrivals', 'departures', 'both'].includes(spot.sees), `${spot.id}: sees="${spot.sees}"`);
+      assert.ok(
+        ['public', 'airside'].includes(spot.accessType),
+        `${spot.id}: accessType="${spot.accessType}"`,
+      );
       assert.ok(spot.viewBearing >= 0 && spot.viewBearing < 360, `${spot.id}: viewBearing ${spot.viewBearing}`);
-      assert.ok(spot.goodFor.length > 0, `${spot.id} covers no runway`);
-      for (const end of spot.goodFor) {
+      assert.ok(
+        spot.arrivalsFor.length + spot.departuresFor.length > 0,
+        `${spot.id} covers no runway in either role`,
+      );
+      for (const end of [...spot.arrivalsFor, ...spot.departuresFor]) {
         assert.ok(RUNWAY_ENDS.has(end), `${spot.id}: "${end}" is not a Heathrow runway end`);
+      }
+      // A spot cannot be under both the approach and the climb-out of the same runway end: the
+      // approach is off one end and the climb-out off the other, four kilometres apart. The
+      // exception is a spot beside the runway itself, which watches the concrete rather than the
+      // air over it — those list the same end twice on purpose.
+      const besideTheRunway = spot.arrivalsFor.length > 1 && spot.departuresFor.length > 1;
+      if (!besideTheRunway) {
+        for (const end of spot.arrivalsFor) {
+          assert.equal(
+            spot.departuresFor.includes(end),
+            false,
+            `${spot.id} claims both ends of ${end} — the reason a spotter ends up at the wrong fence`,
+          );
+        }
       }
     }
   });
 
   it('covers both operating directions, so the list is never empty', () => {
-    const covered = new Set(getSpots().flatMap((spot) => spot.goodFor));
+    const covered = new Set(
+      getSpots().flatMap((spot) => [...spot.arrivalsFor, ...spot.departuresFor]),
+    );
     for (const end of RUNWAY_ENDS) {
       assert.ok(covered.has(end), `no curated spot covers ${end}`);
     }

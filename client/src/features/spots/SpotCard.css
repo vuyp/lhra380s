@@ -268,6 +268,24 @@
   gap: var(--space-2);
 }
 
+/* One row per role: the approach and the climb-out are different places, so they are listed apart. */
+.spot-runway-role {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+
+.spot-runway-role-name {
+  min-inline-size: 5.5rem;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 /* ---- Facts --------------------------------------------------------------------------- */
 
 .spot-facts {

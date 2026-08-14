@@ -195,7 +195,14 @@ export function routeLabel(route: RouteInfo, kind: MovementKind): string {
   if (kind === 'arrival') {
     return origin ? `from ${origin}` : 'Origin unknown';
   }
-  if (destination) return `to ${destination}`;
-  if (origin) return `from ${origin}`;
+  // On the ground at Heathrow: the far end is the interesting one, and Heathrow itself is not it.
+  // "to London" about an aeroplane parked at London is noise dressed as information.
+  if (destination && !isHeathrow(route.destination)) return `to ${destination}`;
+  if (origin && !isHeathrow(route.origin)) return `from ${origin}`;
   return 'Route unknown';
+}
+
+function isHeathrow(place: RouteInfo['origin']): boolean {
+  if (!place) return false;
+  return place.icao?.toUpperCase() === 'EGLL' || place.iata?.toUpperCase() === 'LHR';
 }

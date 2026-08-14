@@ -34,6 +34,13 @@
   --surface-2: #111826;
   --surface-3: #18202f;
   --surface-glass: rgba(17, 24, 38, 0.72);
+  /*
+   * For bars that content scrolls *underneath*. Frosted glass is only ever as good as the
+   * backdrop filter behind it, and a filter that is unsupported, disabled or throttled during
+   * a scroll turns a nav bar into a smear of the list under it. Sticky chrome is opaque, and
+   * separates from the page by tone rather than by transparency.
+   */
+  --surface-sticky: #0b101a;
   --overlay: rgba(3, 5, 9, 0.72);
 
   /* ---- Lines ------------------------------------------------------------- */
@@ -42,9 +49,14 @@
   --line-accent: rgba(55, 224, 200, 0.32);
 
   /* ---- Text -------------------------------------------------------------- */
+  /*
+   * Every one of these clears 4.5:1 against the lightest surface it is used on (--surface-3),
+   * measured, not eyeballed. --text-muted was #64748b, which came in at 3.4:1 and made every
+   * uppercase micro-label on the app illegible in daylight.
+   */
   --text: #eaf0f7;
   --text-secondary: #9aa8bd;
-  --text-muted: #64748b;
+  --text-muted: #8391a5;
   --text-inverse: #05070c;
 
   /* ---- Type -------------------------------------------------------------- */
@@ -129,30 +141,36 @@
     --surface-2: #f7f9fc;
     --surface-3: #eef2f8;
     --surface-glass: rgba(255, 255, 255, 0.82);
+    --surface-sticky: #ffffff;
     --overlay: rgba(240, 243, 248, 0.75);
 
     --line: rgba(12, 20, 34, 0.1);
     --line-strong: rgba(12, 20, 34, 0.18);
-    --line-accent: rgba(20, 150, 132, 0.34);
+    --line-accent: rgba(11, 122, 108, 0.38);
 
     --text: #0c1422;
     --text-secondary: #4a5768;
-    --text-muted: #7c8798;
+    --text-muted: #646e7d;
     --text-inverse: #ffffff;
 
-    --brand-cyan: #0f9e8c;
-    --brand-cyan-dim: #0b7a6c;
-    --brand-amber: #b96f06;
-    --brand-amber-dim: #8f5504;
-    --brand-violet: #5b4bd6;
-    --brand-coral: #d64545;
-    --success: #15803d;
+    /* Light-theme brand values are the darkened variants: on white, the dark-theme cyan and
+       amber measured 3.3:1 and 3.9:1 against body-size text. These clear 4.5:1. */
+    --brand-cyan: #0b7a6c;
+    --brand-cyan-dim: #086053;
+    --brand-amber: #9a5c05;
+    --brand-amber-dim: #7d4903;
+    --brand-violet: #4c3cc4;
+    --brand-coral: #c02626;
+    --success: #146c34;
+    /* --warning had no light-theme value at all: #fbbf24 on white is 1.6:1, and it is the
+       colour every "feed delayed" and "stale" message is printed in. */
+    --warning: #96590a;
 
     --shadow-sm: 0 1px 2px rgba(12, 20, 34, 0.08);
     --shadow-md: 0 6px 20px -8px rgba(12, 20, 34, 0.18);
     --shadow-lg: 0 18px 48px -14px rgba(12, 20, 34, 0.24);
-    --glow-cyan: 0 0 0 1px rgba(15, 158, 140, 0.28), 0 8px 28px -10px rgba(15, 158, 140, 0.3);
-    --glow-amber: 0 0 0 1px rgba(185, 111, 6, 0.26), 0 8px 28px -10px rgba(185, 111, 6, 0.26);
+    --glow-cyan: 0 0 0 1px rgba(11, 122, 108, 0.3), 0 8px 28px -10px rgba(11, 122, 108, 0.32);
+    --glow-amber: 0 0 0 1px rgba(154, 92, 5, 0.28), 0 8px 28px -10px rgba(154, 92, 5, 0.28);
   }
 }
 
@@ -163,28 +181,34 @@
   --surface-2: #f7f9fc;
   --surface-3: #eef2f8;
   --surface-glass: rgba(255, 255, 255, 0.82);
+  --surface-sticky: #ffffff;
   --overlay: rgba(240, 243, 248, 0.75);
 
   --line: rgba(12, 20, 34, 0.1);
   --line-strong: rgba(12, 20, 34, 0.18);
-  --line-accent: rgba(20, 150, 132, 0.34);
+  --line-accent: rgba(11, 122, 108, 0.38);
 
   --text: #0c1422;
   --text-secondary: #4a5768;
-  --text-muted: #7c8798;
+  --text-muted: #646e7d;
   --text-inverse: #ffffff;
 
-  --brand-cyan: #0f9e8c;
-  --brand-cyan-dim: #0b7a6c;
-  --brand-amber: #b96f06;
-  --brand-amber-dim: #8f5504;
-  --brand-violet: #5b4bd6;
-  --brand-coral: #d64545;
-  --success: #15803d;
+  /* Light-theme brand values are the darkened variants: on white, the dark-theme cyan and
+     amber measured 3.3:1 and 3.9:1 against body-size text. These clear 4.5:1. */
+  --brand-cyan: #0b7a6c;
+  --brand-cyan-dim: #086053;
+  --brand-amber: #9a5c05;
+  --brand-amber-dim: #7d4903;
+  --brand-violet: #4c3cc4;
+  --brand-coral: #c02626;
+  --success: #146c34;
+  /* --warning had no light-theme value at all: #fbbf24 on white is 1.6:1, and it is the
+     colour every "feed delayed" and "stale" message is printed in. */
+  --warning: #96590a;
 
   --shadow-sm: 0 1px 2px rgba(12, 20, 34, 0.08);
   --shadow-md: 0 6px 20px -8px rgba(12, 20, 34, 0.18);
   --shadow-lg: 0 18px 48px -14px rgba(12, 20, 34, 0.24);
-  --glow-cyan: 0 0 0 1px rgba(15, 158, 140, 0.28), 0 8px 28px -10px rgba(15, 158, 140, 0.3);
-  --glow-amber: 0 0 0 1px rgba(185, 111, 6, 0.26), 0 8px 28px -10px rgba(185, 111, 6, 0.26);
+  --glow-cyan: 0 0 0 1px rgba(11, 122, 108, 0.3), 0 8px 28px -10px rgba(11, 122, 108, 0.32);
+  --glow-amber: 0 0 0 1px rgba(154, 92, 5, 0.28), 0 8px 28px -10px rgba(154, 92, 5, 0.28);
 }

@@ -45,9 +45,7 @@
   /* Negative inline margin lets the blurred bar reach the gutters while the text stays aligned. */
   margin-inline: calc(var(--space-4) * -1);
   padding: var(--space-3) var(--space-4);
-  background: var(--surface-glass);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  background: var(--surface-sticky);
   border-block-end: 1px solid var(--line);
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
@@ -94,14 +92,28 @@
   gap: var(--space-3);
 }
 
+/*
+ * A quiet section is normal, not an error: a low-contrast inset panel with the section's own
+ * icon, rather than a big dashed hole in the page repeated three times over.
+ */
 .board-none {
-  max-width: 58ch;
-  padding: var(--space-4);
-  border: 1px dashed var(--line-strong);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 62ch;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
   border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-1) 60%, transparent);
   font-size: var(--text-base);
-  line-height: 1.55;
+  line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.board-none-icon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--text-muted);
 }
 
 /* ---- Larger screens --------------------------------------------------------------- */

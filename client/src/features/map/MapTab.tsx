@@ -16,6 +16,7 @@ import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GlobalAircraft, Movement, SpotEvaluation } from '../../../../shared/types.ts';
 import { useNow, useSnapshot } from '../../api/useSnapshot.ts';
+import { navigateTo, useRouteDetail } from '../../state/route.ts';
 import { useSelection } from '../../state/selection.tsx';
 import { useSettings } from '../../state/settings.tsx';
 import { Icon } from '../../components/ui/Icon.tsx';
@@ -38,6 +39,9 @@ const DASH = '—';
 const MAX_EXTRAPOLATION_S = 120;
 /** How long a marker takes to slide onto a freshly received position. */
 const BLEND_MS = 700;
+
+/** Zoom used when another tab points the map at one particular spotting location. */
+const SPOT_FOCUS_ZOOM = 14;
 
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
@@ -107,6 +111,12 @@ interface TrackState {
   baseLat: number;
   baseLon: number;
   baseTime: number;
+  /**
+   * Whether this marker may be dead-reckoned forward at all. False once the movement is coasting:
+   * the fix is minutes old, and sliding the icon a fixed two minutes of flight ahead of it — up to
+   * 16 nm at cruise — draws invented track exactly where the data is least trustworthy.
+   */
+  extrapolate: boolean;
   track: number | null;
   groundSpeed: number | null;
   renderLat: number;
@@ -244,10 +254,12 @@ function stepAircraft(states: Map<string, TrackState>, animate: boolean, now: nu
     let heading = state.track ?? state.renderHeading;
 
     if (animate) {
-      const seconds = Math.min(Math.max((now - state.baseTime) / 1000, 0), MAX_EXTRAPOLATION_S);
-      const predicted = deadReckon(state.baseLat, state.baseLon, state.track, state.groundSpeed, seconds);
-      lat = predicted.lat;
-      lon = predicted.lon;
+      if (state.extrapolate) {
+        const seconds = Math.min(Math.max((now - state.baseTime) / 1000, 0), MAX_EXTRAPOLATION_S);
+        const predicted = deadReckon(state.baseLat, state.baseLon, state.track, state.groundSpeed, seconds);
+        lat = predicted.lat;
+        lon = predicted.lon;
+      }
 
       const elapsed = now - state.blendStart;
       // Never ease across the antimeridian — that would send the marker the long way round.
@@ -300,6 +312,7 @@ export function MapTab(): ReactElement {
   const previousSelection = useRef<string | null>(null);
 
   const [mapReady, setMapReady] = useState(false);
+  const [basemapDown, setBasemapDown] = useState(false);
   const [showSpots, setShowSpots] = useState(true);
   const [worldView, setWorldView] = useState(false);
   const [spots, setSpots] = useState<SpotEvaluation[] | null>(null);
@@ -351,9 +364,8 @@ export function MapTab(): ReactElement {
     aircraftLayerRef.current = aircraft;
 
     const spotOverlay = createSpotOverlay({
-      onOpenSpot: () => {
-        window.location.hash = '#spots';
-      },
+      // Carry the spot across: the Spots tab opens with this card expanded and in view.
+      onOpenSpot: (spot) => navigateTo('spots', spot.id),
     });
     spotRef.current = spotOverlay;
 
@@ -399,6 +411,24 @@ export function MapTab(): ReactElement {
     layer.addTo(map);
     tileRef.current = layer;
 
+    /*
+     * The basemap is the one thing on this screen we do not serve ourselves. When CARTO cannot
+     * be reached — a captive portal, a blocked CDN, a dead 4G cell — Leaflet just leaves the
+     * canvas empty, which reads as "the app is broken". Say what actually happened instead:
+     * everything we do own (runways, centrelines, aircraft, spots) is still live and drawn.
+     */
+    let failures = 0;
+    const onTileError = (): void => {
+      failures += 1;
+      if (failures >= 4) setBasemapDown(true);
+    };
+    const onTileLoad = (): void => {
+      failures = 0;
+      setBasemapDown(false);
+    };
+    layer.on('tileerror', onTileError);
+    layer.on('tileload', onTileLoad);
+
     let dropped = false;
     const dropPrevious = (): void => {
       if (dropped) return;
@@ -412,6 +442,8 @@ export function MapTab(): ReactElement {
     else dropped = true;
 
     return () => {
+      layer.off('tileerror', onTileError);
+      layer.off('tileload', onTileLoad);
       layer.off('load', dropPrevious);
       dropPrevious();
     };
@@ -477,6 +509,35 @@ export function MapTab(): ReactElement {
     else overlay.layer.remove();
   }, [mapReady, showSpots, spots]);
 
+  /* -- A spot handed to us by the Spots tab ----------------------------------------- */
+
+  /**
+   * `#map/<spot-id>`: someone pressed "show on map" on a specific fence. Centre it and open its
+   * card — arriving at the standing Heathrow view with eleven identical pins answers nothing.
+   */
+  const focusSpotId = useRouteDetail('map');
+  const focusedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const overlay = spotRef.current;
+    if (!map || !overlay || !mapReady || focusSpotId === null) return;
+    if (focusedRef.current === focusSpotId) return;
+    const marker = overlay.markerFor(focusSpotId);
+    if (!marker) return; // spots may not have loaded yet; this effect re-runs when they do
+    if (!showSpots || !map.hasLayer(overlay.layer)) {
+      // The pins are hidden: turn them on and come back on the next pass, once the layer is up.
+      setShowSpots(true);
+      return;
+    }
+    focusedRef.current = focusSpotId;
+    setWorldView(false);
+    map.setView(marker.getLatLng(), Math.max(map.getZoom(), SPOT_FOCUS_ZOOM), {
+      animate: !reducedMotion,
+    });
+    marker.openPopup();
+  }, [focusSpotId, mapReady, reducedMotion, showSpots, spots]);
+
   /* -- Aircraft -------------------------------------------------------------------- */
 
   const tracked = useMemo(
@@ -502,6 +563,8 @@ export function MapTab(): ReactElement {
       present.add(item.hex);
       const age = Math.min(Math.max(item.ageSeconds, 0), MAX_EXTRAPOLATION_S);
       const baseTime = timestamp - age * 1000;
+      // Smoothing between five-second polls is honest; guessing on top of a held position is not.
+      const extrapolate = !item.visual.coasting;
       const existing = states.get(item.hex);
 
       if (existing) {
@@ -512,6 +575,7 @@ export function MapTab(): ReactElement {
         existing.baseLat = item.lat;
         existing.baseLon = item.lon;
         existing.baseTime = baseTime;
+        existing.extrapolate = extrapolate;
         existing.track = item.track;
         existing.groundSpeed = item.groundSpeed;
         existing.handle.setVisual(item.visual);
@@ -532,6 +596,7 @@ export function MapTab(): ReactElement {
         baseLat: item.lat,
         baseLon: item.lon,
         baseTime,
+        extrapolate,
         track: item.track,
         groundSpeed: item.groundSpeed,
         renderLat: item.lat,
@@ -718,50 +783,13 @@ export function MapTab(): ReactElement {
 
   return (
     <section className="map-tab" aria-label="Live map of Heathrow A380 traffic">
-      <div
-        className="map-canvas"
-        ref={containerRef}
-        role="application"
-        aria-label="Map. Aircraft and spotting locations are focusable; use arrow keys to pan and plus or minus to zoom."
-      />
-
-      <div className="map-status">
-        <p className="map-status-line" aria-live="polite">
-          <span className={live ? 'map-dot map-dot--live' : 'map-dot map-dot--stale'} aria-hidden="true" />
-          <span className="map-status-text">{announcement ?? status}</span>
-        </p>
-        <p className="map-status-meta">
-          {connected
-            ? `Live · updated ${formatRelative(lastUpdate, now)}`
-            : error !== null && !snapshot
-              ? 'Offline — no data received'
-              : `Reconnecting · last update ${formatRelative(lastUpdate, now)}`}
-        </p>
-      </div>
-
-      {loading && !snapshot ? (
-        <div className="map-overlay" role="status">
-          <span className="map-overlay-pulse" aria-hidden="true" />
-          <p className="map-overlay-title">Finding the whales</p>
-          <p className="map-overlay-text">
-            Waiting for the first snapshot from the tracker. The map is live as soon as it lands.
-          </p>
-        </div>
-      ) : null}
-
-      {!loading && !snapshot && error !== null ? (
-        <div className="map-overlay" role="alert">
-          <span className="map-overlay-icon" aria-hidden="true">
-            <Icon name="alert" size={22} />
-          </span>
-          <p className="map-overlay-title">No live feed</p>
-          <p className="map-overlay-text">
-            {error}. The runways below are drawn from published data, but nothing is flying on this
-            map until the feed returns — we would rather show you nothing than invent traffic.
-          </p>
-        </div>
-      ) : null}
-
+      {/*
+        The controls and the legend come first in the DOM on purpose. Leaflet appends every
+        marker inside the canvas, so with the natural order a keyboard user had to tab past
+        eleven spot pins and every aircraft on screen — 52 presses in world view — to reach the
+        zoom buttons, and world view can only be turned off from those buttons. Both blocks are
+        absolutely positioned, so nothing about the layout changes.
+      */}
       <div className="map-controls" role="group" aria-label="Map controls">
         <button type="button" className="map-btn" onClick={() => zoomBy(1)} title="Zoom in">
           <span className="map-btn-glyph" aria-hidden="true">
@@ -811,37 +839,112 @@ export function MapTab(): ReactElement {
         onToggle={(event) => setLegendOpen(event.currentTarget.open)}
       >
         <summary className="map-legend-summary">Legend</summary>
+        {/*
+          The swatches have to describe what the map actually draws. Aircraft are painted in their
+          operator's brand colour with a coloured glow for their role, so the aircraft rows are
+          glows around a neutral planform — a flat teal square here matched nothing on screen.
+        */}
         <ul className="map-legend-list">
           <li className="map-legend-item">
-            <span className="map-swatch map-swatch--arrival" aria-hidden="true" />
-            Arriving
+            <span className="map-swatch map-swatch--glow-arrival" aria-hidden="true" />
+            Arriving — teal glow, chevron down
           </li>
           <li className="map-legend-item">
-            <span className="map-swatch map-swatch--departure" aria-hidden="true" />
-            Departing
+            <span className="map-swatch map-swatch--glow-departure" aria-hidden="true" />
+            Departing — amber glow, chevron up
           </li>
           <li className="map-legend-item">
-            <span className="map-swatch map-swatch--ground" aria-hidden="true" />
-            On the ground
+            <span className="map-swatch map-swatch--glow-ground" aria-hidden="true" />
+            On the ground — no glow, no chevron
           </li>
+          {worldView ? (
+            <li className="map-legend-item">
+              <span className="map-swatch map-swatch--glow-world" aria-hidden="true" />
+              Elsewhere in the world — grey, no Heathrow movement
+            </li>
+          ) : null}
           <li className="map-legend-item">
             <span className="map-swatch map-swatch--landing" aria-hidden="true" />
-            Landing runway
+            Landing runway and its approach
           </li>
           <li className="map-legend-item">
             <span className="map-swatch map-swatch--departing" aria-hidden="true" />
-            Departure runway
+            Departure runway and its climb-out
           </li>
           {showSpots && spots && spots.length > 0 ? (
             <li className="map-legend-item">
               <span className="map-swatch map-swatch--spot" aria-hidden="true" />
-              Spotting location
+              Spotting location — ringed ones rate excellent right now
             </li>
           ) : null}
         </ul>
+        <p className="map-legend-note">
+          Each aircraft is drawn in its airline's colour; the glow around it is what says whether
+          it is arriving or departing.
+        </p>
         {showSpots && spotsError ? <p className="map-legend-note">{spotsError}</p> : null}
         {config && config.summary ? <p className="map-legend-note">{config.summary}</p> : null}
       </details>
+
+      <div
+        className="map-canvas"
+        ref={containerRef}
+        role="application"
+        aria-label="Map. Aircraft and spotting locations are focusable; use arrow keys to pan and plus or minus to zoom."
+      />
+
+      <div className="map-topleft">
+        <div className="map-status">
+          <p className="map-status-line" aria-live="polite">
+            <span
+              className={live ? 'map-dot map-dot--live' : 'map-dot map-dot--stale'}
+              aria-hidden="true"
+            />
+            <span className="map-status-text">{announcement ?? status}</span>
+          </p>
+          <p className="map-status-meta">
+            {connected
+              ? `Live · updated ${formatRelative(lastUpdate, now)}`
+              : error !== null && !snapshot
+                ? 'Offline — no data received'
+                : `Reconnecting · last update ${formatRelative(lastUpdate, now)}`}
+          </p>
+        </div>
+
+        {basemapDown ? (
+          <p className="map-basemap-note" role="status">
+            <Icon name="info" size={15} />
+            <span>
+              Basemap tiles are not loading. The runways, centrelines, aircraft and spot pins are
+              ours, and they are still live.
+            </span>
+          </p>
+        ) : null}
+      </div>
+
+      {loading && !snapshot ? (
+        <div className="map-overlay" role="status">
+          <span className="map-overlay-pulse" aria-hidden="true" />
+          <p className="map-overlay-title">Finding the whales</p>
+          <p className="map-overlay-text">
+            Waiting for the first snapshot from the tracker. The map is live as soon as it lands.
+          </p>
+        </div>
+      ) : null}
+
+      {!loading && !snapshot && error !== null ? (
+        <div className="map-overlay" role="alert">
+          <span className="map-overlay-icon" aria-hidden="true">
+            <Icon name="alert" size={22} />
+          </span>
+          <p className="map-overlay-title">No live feed</p>
+          <p className="map-overlay-text">
+            {error}. The runways below are drawn from published data, but nothing is flying on this
+            map until the feed returns — we would rather show you nothing than invent traffic.
+          </p>
+        </div>
+      ) : null}
+
     </section>
   );
 }
