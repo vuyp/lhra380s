@@ -251,7 +251,10 @@ export interface SpotEvaluation {
   rating: 'excellent' | 'good' | 'fair' | 'poor';
   /** Whether the sun is behind the photographer (good) or in frame (bad). */
   light: 'ideal' | 'workable' | 'backlit' | 'dark';
-  /** Straight-line distance from the user, nautical miles — client-side only. */
+  /**
+   * Straight-line distance from the user to the spot, in kilometres. Filled in by the client from
+   * the browser's geolocation and never by the server, which has no idea where the reader is.
+   */
   distanceKm?: number;
 }
 

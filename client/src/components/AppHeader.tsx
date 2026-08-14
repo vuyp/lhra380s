@@ -409,7 +409,7 @@ function SettingsPanel(): ReactElement {
       <section className="hdr-set-group">
         <h3 className="hdr-set-title">About</h3>
         <p className="hdr-set-note">
-          Positions come from the ADS-B Exchange community feed via adsb.lol; weather from the
+          Positions come from adsb.lol, a volunteer-run ADS-B aggregation network; weather from the
           aviationweather.gov METAR service. Runway configuration and ETAs are derived from
           observed traffic, not from an airline schedule — anything we cannot verify is labelled
           unknown. No account, no tracking, no ads.

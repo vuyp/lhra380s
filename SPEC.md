@@ -23,9 +23,11 @@ adsb.lol  ─┐
            ├─► server (Node 22 + TS, single shared poller, in-memory state + JSONL log)
 METAR API ─┘        │
                     ├── GET  /api/snapshot     full state (JSON)
-                    ├── GET  /api/stream       SSE, pushes snapshot deltas
+                    ├── GET  /api/stream       SSE, pushes a whole snapshot per update
+                    ├── GET  /api/spots        spotting locations ranked for right now
                     ├── GET  /api/movements    today's + historical movement log
-                    ├── GET  /api/aircraft/:hex single airframe + trail
+                    ├── GET  /api/aircraft/:hex single airframe + trail + its logged history
+                    ├── GET  /api/health       feed + per-endpoint upstream health
                     └── static  client/dist    (Vite + React + Leaflet PWA)
 ```
 
@@ -85,18 +87,39 @@ Runways: `09L/27R` (thresholds 09L `51.4775,-0.4845` / 27R `51.4779,-0.4334`) an
 
 | phase | rule of thumb |
 |---|---|
-| `inbound` | airborne, converging on LHR (closing distance, bearing-to-LHR within ~60° of track), >25 nm out |
+| `inbound` | airborne, converging on LHR (closing distance, bearing-to-LHR within ~55° of track), >25 nm out, and passing the arrival test below |
 | `approach` | airborne, within 25 nm, descending or below 6 000 ft, aligned with an LHR runway |
 | `landed` | was `approach`, now on ground within the airport polygon |
 | `stand` | on ground at LHR, groundspeed < 3 kt for > 3 min |
 | `taxi_out` | on ground at LHR, moving, after having been at a stand |
-| `departing` | on ground, groundspeed > 60 kt, on a runway centreline |
+| `departing` | on ground, groundspeed > 60 kt, on a runway centreline, **and accelerating** — a landing roll-out is the same picture in a single frame, so the previous report must not have been airborne and the aircraft must not be inside the turnaround that follows its own logged touchdown |
 | `climb_out` | airborne, within 30 nm, climbing, departed LHR in this session |
 | `outbound` | airborne, diverging from LHR, last seen departing LHR (keep for 90 min) |
 | `elsewhere` | any other A380 in the world — powers the global fleet view |
 
-Hysteresis is mandatory: a phase must be confirmed by 2 consecutive polls before it flips, and a
-flight must not be dropped for **20 minutes** of no data (ADS-B coverage gaps).
+**The arrival test.** "Closing and pointing this way" is not sufficient, and building it that way
+put overflights on the board: Emirates DXB–JFK, Lufthansa FRA–LAX and Qatar DOH–IAD all cross
+southern England at cruise, closing on Heathrow and aimed within a few degrees of it, for the
+better part of an hour. Geometry alone may therefore assert an arrival only **inside 175 nm**,
+where the aircraft must also be under a 3:1 descent profile (with slack) or visibly down from its
+own observed cruise level; inside 60 nm altitude is decisive on its own. Beyond 175 nm the only
+thing that may board an aircraft is a curated rotation naming EGLL — and that is a plan, not an
+observation, so it is carried as unconfirmed until the aeroplane's own descent corroborates it.
+A curated rotation naming somewhere *else* is a veto at any range.
+
+The result is graded, not binary: `confirmed` when the aircraft's own behaviour proves it,
+`likely` when it does not yet. The UI must surface that distinction (`EtaInfo.source` is
+`observed` for the former, `inferred` for the latter) rather than presenting both as fact. A
+confirmed arrival is **sticky** — it stays on the board through vectors and holds until it climbs
+away from its own closest approach — because a downwind leg points away from the field and a hold
+points everywhere in turn.
+
+Hysteresis is mandatory: a phase must be confirmed by 2 consecutive polls before it flips. The two
+exceptions are `landed` and `departing`, which are observed physical events (wheels down inside the
+airport polygon, an accelerating 60 kt+ roll on a centreline) and apply the moment they happen. A
+flight must not be dropped for **20 minutes** of no data (ADS-B coverage gaps) — 90 minutes for
+`outbound`, which is flying out of receiver coverage by definition — and is marked `coasting` while
+it is being held.
 
 **ETA**: great-circle distance to LHR ÷ groundspeed, plus a phase-dependent pad for the approach
 (sequencing/holding): +6 min beyond 80 nm, +3 min inside. Round to the minute; never show a
@@ -104,9 +127,17 @@ negative or absurd (>16 h) ETA — show `—` instead. Recompute every frame, bu
 (exponential moving average) so the countdown never jitters.
 
 **Runway prediction** for an arrival: whichever landing runway of the active config the aircraft's
-current track and position best line up with; before that is knowable, use the config default
-(27R for arrivals under westerly ops when LHR alternates — note alternation only as a hint, never
-as fact). Always label predictions as predictions.
+current track and position best line up with. Before that is knowable, fall back to the active
+configuration — but only when it names exactly one landing runway, and at a confidence scaled down
+to say plainly that this is the airport talking rather than this aeroplane. When the configuration
+cannot name one, the answer is "unknown" and the UI shows *TBC*; there is no hardcoded 27R default,
+because Heathrow's alternation is a hint and a hint stated as fact is a fabrication. Always label
+predictions as predictions.
+
+Once the wheels have touched or left the ground the runway is no longer predicted: it is read off
+the last airborne fix / the runway the aircraft is physically rolling down, and only a geometric
+match is written to the permanent movement log — a runway that came from the configuration is a
+prediction, and `LoggedMovement` carries no provenance field for the UI to qualify it with.
 
 **Active runway config** is derived, not guessed: take LHR-area traffic below 4 000 ft within 15 nm,
 project onto each runway axis, and classify by direction of travel. Westerly ops if the majority

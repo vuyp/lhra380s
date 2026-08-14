@@ -112,16 +112,18 @@ function IdleWhale(p: { snapshot: Snapshot; now: number }): ReactElement {
         <Stat
           wrap
           label="Last movement"
+          // The identifier alone in the value: the value line is a single ellipsised row, and
+          // "BAW55G departed" does not fit one column of this grid on a phone — it renders as
+          // "BAW55G depa…", which loses the one word that says which way the aeroplane went. The
+          // verb belongs with the time, in the caption, which is the box that wraps.
           value={
-            last
-              ? `${last.flightNumber ?? last.callsign ?? last.registration ?? 'A380'} ${
-                  last.kind === 'arrival' ? 'landed' : 'departed'
-                }`
-              : 'None logged'
+            last ? (last.flightNumber ?? last.callsign ?? last.registration ?? 'A380') : 'None logged'
           }
           sub={
             last
-              ? `${formatRelative(last.at, now)}${last.runway ? ` · ${last.runway}` : ''}`
+              ? `${last.kind === 'arrival' ? 'landed' : 'departed'} ${formatRelative(last.at, now)}${
+                  last.runway ? ` · ${last.runway}` : ''
+                }`
               : 'nothing in the last 24 h'
           }
         />

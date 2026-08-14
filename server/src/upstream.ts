@@ -602,7 +602,10 @@ function windDirection(value: unknown): number | null {
   if (typeof value === 'string' && value.trim().toUpperCase() === 'VRB') return null;
   const n = num(value);
   if (n === null) return null;
-  return normaliseDegrees(n === 360 ? 360 : n);
+  // 360 is a wind from the north; 000 in a METAR means calm. They are different reports, so the
+  // wrap that turns 360 into 0 must not run here — it printed "N 0° 5 kt" for a reported 36005KT.
+  if (n === 360) return 360;
+  return normaliseDegrees(n);
 }
 
 /** `visib` is a number (statute miles) or a string such as "10+". Reported verbatim. */

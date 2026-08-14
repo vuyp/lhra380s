@@ -56,10 +56,16 @@ A380 simply vanishes for an hour and comes back. The tracker keeps its state for
 silence (90 for departures), marks it `coasting`, and shows the age of the data — rather than
 deleting the flight and re-adding it as if it were new.
 
-**Honest arrivals.** A flight is only on the arrivals board if the geometry agrees: it must be
-closing on Heathrow, with the bearing to the airport within ~55° of its track, and the distance
-actually decreasing poll over poll. A schedule that says `EGLL` is not enough. An A380 over
-Singapore does not appear on the Heathrow board.
+**Honest arrivals.** The hard case is not the A380 over Singapore — that one fails on distance and
+heading alone. It is the Emirates DXB–JFK and the Lufthansa FRA–LAX, which cross southern England
+at cruise, closing on Heathrow and pointing straight at it, for the better part of an hour. So a
+flight reaches the arrivals board only if it is closing, with the bearing to the airport within
+~55° of its track, **and** it is inside 175 nm having visibly left its cruise — an overflight holds
+its level all the way across, an arrival does not. Beyond that radius the only thing that may board
+an aircraft is the curated timetable naming `EGLL`, and even then it is shown as unconfirmed until
+the aeroplane's own behaviour corroborates it. Once confirmed an arrival is sticky, so vectors and
+holds do not drop it off the board. Both halves of this are replayed in the test suite against
+recorded tracks of a real arrival and a real overflight.
 
 **Smoothed countdowns.** ETAs are exponentially smoothed so the number counts down instead of
 flickering, and absurd values collapse to `—` rather than rendering a lie to the minute.
@@ -97,7 +103,9 @@ No configuration, no keys, no database. Movement history is appended to a JSONL 
 
 ```bash
 npm run typecheck  # strict TS across server and client
-npm test           # server unit tests (geo, sun, runway derivation)
+npm test           # 192 server tests: geo, sun, runway derivation, the HTTP and SSE layer,
+                   # upstream failure handling, and the arrival classifier replayed against
+                   # recorded ADS-B tracks of a real arrival and a real overflight
 ```
 
 ## Layout

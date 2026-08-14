@@ -14,7 +14,7 @@
     "build": "vite build",
     "start": "tsx server/src/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p client/tsconfig.json",
-    "test": "node --test server/test/*.test.ts"
+    "test": "tsx --test server/test/*.test.ts"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
