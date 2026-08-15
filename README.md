@@ -7,6 +7,8 @@
 Countdowns, the active runway configuration, and the best place to stand — free, unlimited,
 no account, no API key, no ads.
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/vuyp/lhra380s)
+
 </div>
 
 ---
@@ -101,6 +103,21 @@ shown. The 253 airframes in `data/fleet.json` were validated against the live AD
 registrations and ICAO 24-bit addresses match on every aircraft observed.
 
 ## Run it
+
+### In a Codespace
+
+[**Open in GitHub Codespaces**](https://codespaces.new/vuyp/lhra380s) — nothing to configure. The
+devcontainer installs and builds on create, then starts the server on attach and forwards port
+**8787**, so the app opens in a preview tab pointed at live Heathrow traffic. First boot takes a
+minute or two; if the preview looks empty, give the poller a few seconds to complete its first
+sweep.
+
+Bear in mind what the sky is doing when you look. Heathrow has a **night curfew** (roughly
+23:00–06:00 London), and A380 arrivals cluster in the early morning and around the late-afternoon
+Emirates rotations — an empty board at 02:00 is the app being right, not broken. The Fleet tab's
+world view shows every A380 airborne on earth and is populated at any hour.
+
+### Locally
 
 ```bash
 npm install
